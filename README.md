@@ -1,6 +1,6 @@
 <!--
 ignore these words in spell check for this file
-// cSpell:ignore udemy
+// cSpell:ignore udemy println beny
 -->
 
 # Docker & Kubernetes: The Practical Guide
@@ -368,6 +368,7 @@ docker image ls #list
 docker images  #also list
 docker image rm rnd
 ```
+
 #### Removing Stopped Containers Automatically
 
 if we don't intended to start a container after it's been finished we can automatically remove it after it's done or stopped. this is done with the *--rm* flag. 
@@ -375,11 +376,129 @@ if we don't intended to start a container after it's been finished we can automa
 
 #### A Look Behind the Scenes: Inspecting Images
 
+the container build on top of the image, they have their own layer above it, but they all share the image layers.
+
+we can get more information about images with `docker image inspect`
+
+```sh
+docker image inspect nginx
+docker image inspect nginx --format "{{.Metadata}}"
+docker image inspect nginx --format "{{json .RootFs.Layers}}"
+docker image inspect nginx --format "{{range .RootFS.Layers}}{{println .}}{{end}}"
+```
+
 #### Copying Files Into & From A Container
+
+copy files between the container and the host system.
+we specify the source, the and where to copy to.
+we can specify either the host or the container as the source or destination.
+
+```sh
+docker container run -d --name ngn --rm nginx
+echo "ddd" >> dummy.txt
+docker container cp dummy.txt ngn:/test123
+rm dummy.txt
+docker container cp ngn:/test123 dummy
+```
+
+if we want, we could copy code into the container, but it's not a good way. there are better ways to do that.
+but some scenarios could prove useful, the more common case is to copy files from the container out to the host, if we forgot to set up a data volume.
 
 #### Naming & Tagging Containers and Images
 
-#### Time to Practice: Images & Containers
+we can give names for images and containers, instead of using the image id or the container random name.
+
+for containers, we simply pass the *--name* flag and give it a unique name. we can rename a container with `docker container rename <old name> <new name>`
+
+for images, there aren't names exactly, but we use tags instead.
+we can add tags to exiting images or add the tag when we build the image.
+tags are structured as two parts **name:tag**, the name is shared for the image, and the tag can specify a specific image version, such as "latest", "alpha", "12.0.1"\
+to build an image with a tag with add the *--tag,-t* flag. if we want to remove a tag from an image, we use `docker image rm` and specify the tag. an image can have any number of tags.
+
+```sh
+docker image tag nginx nginx:beny
+docker image ls
+docker image rm nginx:beny
+docker image ls
+```
+
+
+#### Assignment Time to Practice: Images & Containers
+
+lets look at the assignment, we have a folder "assignment-problem"
+
+> Dockerize BOTH apps - the Python and the Node app.
+> 1. Create appropriate images for both apps (two separate images!).\
+> HINT: Have a brief look at the app code to configure your images correctly!
+> 2. Launch a container for each created image, making sure, 
+that the app inside the container works correctly and is usable.
+> 3. Re-create both containers and assign names to both containers.
+Use these names to stop and restart both containers.
+> 4. Clean up (remove) all stopped (and running) containers, 
+clean up all created images.
+> 5. Re-build the images - this time with names and tags assigned to them.
+> 6. Run new containers based on the re-built images, ensuring that the containers
+are removed automatically when stopped.
+
+first step is to create a Dockerfile in each folder so we could build an image
+```sh
+cd assignment-problem
+touch node-app/Dockerfile python-app/Dockerfile #won't work in windows
+```
+
+dockerfile for python app
+```dockerfile
+FROM python
+
+WORKDIR /app
+
+COPY . /app
+
+CMD ["python", "bmi.py"]
+```
+
+dockerfile for node app
+```dockerfile
+FROM node
+
+WORKDIR /app
+
+COPY package.json .
+
+RUN npm install
+
+COPY . .
+
+EXPOSE 3000
+
+CMD [ "node", "server.js" ]
+```
+
+now we build the images and launch the containers
+```sh
+docker image build python-app/.
+docker container run -it <python image>
+
+docker image build node-app/.
+docker container run --detach --publish 80:3001 <node image>
+```
+
+stopping and removing images and containers
+```sh
+docker container stop <container 1> <container 2>
+docker container rm <container 1> <container 2>
+docker image rm <python image> <node image>
+```
+
+building images with tags and running containers with names
+```sh
+docker image build --tag ass1py:0.0.1 python-app/.
+docker container run -it --rm --name bmi ass1py:0.0.1
+docker image build --tag ass1nd:0.0.1 node-app/.
+docker container run --detach --publish 80:3001 --rm --name nd ass1nd:0.0.1
+docker container stop nd
+```
+
 
 #### Sharing Images - Overview
 
