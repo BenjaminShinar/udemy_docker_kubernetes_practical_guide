@@ -5,8 +5,9 @@
     "dictionaries": [],
     "words": [
         "Kubernetes",
-        "WORKDIR"
+        "WORKDIR",
+        "DockerHub"
     ],
-    "ignoreWords": ["Schwarzmüller","Academind"],
+    "ignoreWords": ["Schwarzmüller","Academind","dockerignore"],
     "import": []
 }
