@@ -1,6 +1,6 @@
 <!--
 ignore these words in spell check for this file
-// cSpell:ignore udemy println beny
+// cSpell:ignore udemy println beny swfavorites macvlan
 -->
 
 # Docker & Kubernetes: The Practical Guide
@@ -768,7 +768,7 @@ so we have to rebuild the image.
 
 ```sh
 docker image build --tag feedback:0.0.4 .\data-volumes-01-starting-setup\ 
-docker container run --detach --name feedback -v feedback:/app/feedback -v D:/Docker_Kubernetes_The_Practical_Guide/data-volumes-01-starting-setup:/app -p 3000:80 feedback:0.0.4
+docker container run --detach --name feedback -v feedback:/app/feedback -v D:/Docker_Kubernetes_The_Practical_Guide/ \ data-volumes-01-starting-setup:/app -p 3000:80 feedback:0.0.4
 ```
 
 for windows, because of wsl2, stuff doesn't work. there is an issue.
@@ -782,20 +782,248 @@ docker container run -v named:/app/data #named volume
 docker container run -v /path/to/code:/app/data #bind mount
 ```
 
-| Volume type     | Lifetime                                                            | Reusability | creation                                  | notes                                            |
+| Volume type     | Lifetime                                                            | Reusability | Creation                                  | Notes                                            |
 | ---------- | ------------------------------------------------------------------- | ----------- | ----------------------------------------- | ------------------------------------------------ |
-| Anonymous  | with the container,disappears if the container used the *--rm flag* | none        | with the *-v* flag or from the dockerfile | create a match with outside resources to override bind-mounts           |
+| Anonymous  | with the container, disappears if the container used the *--rm flag* | none        | with the *-v* flag or from the dockerfile | create a match with outside resources to override bind-mounts           |
 | Named      | persistent                                                          | yes, between containers and across time         | passing a name with the *-v* flag         | data can be shared across containers
 | Bind Mount | persistent                                                          | yes, code is shared with the host machine        | passing an absolute path                  | allows for bi-directional changes in source code |
 
 
 #### A Look at Read-Only Volumes
+
+if the idea is to make changes to the source code available to the container, then it doesn't make sense for the container to be able to change the files on the host system. to enforce this, we can make the bind mount a read-only  volume, if we add **":ro"** after the container path in the volume, we make this volume read only.  the same rules of specificity apply, more specific volumes are stronger the general, so an anonymous volume will allow writing data again. \
+Overriding only happens if we write them in the command line, not in the dockerfile.
+
+
+```sh
+docker container run --detach --rm --name feedback -p 3000:80  -v feedback:/app/feedback -v D:/Docker_Kubernetes_The_Practical_Guide/data-volumes-01-starting-setup:/app:ro -v /app/temp -v /app/node_modules -v feedback:0.0.4
+```
+
 #### Managing Docker Volumes
+
+volumes are managed by docker,  we can look at available commands for volumes with `docker volume --help`.
+
+- create
+- inspect
+- ls
+- prune
+- rm
+
+we can list all our volumes, which will show us named and anonymous volumes, but not bind mounts.
+we can create named volumes before running the container.
+if we inspect the volumes, we can find the mount point on the host machine, this won't work well in windows, because docker desktop runs a virtual machine to run docker. if the volume is a readonly, it will show under the "options" key.
+
+we can remove either all volumes (prune) or a specific one, but that also clears all of our data, so we need to be careful with them.
+
+
+
 #### Using "COPY" vs Bind Mounts
+
+if we are using the bind mount to get all the files into the container then why are we copying the contents inside the dockerfile?
+
+the answer is that bind mounts are used during development, this is so we can reflect changes without stopping the container and re-building the image. once we get to the production/deployment stage, we won't have the source code available on the server, and we won't want to change it during runtime.
+
 #### Don't COPY Everything: Using "dockerignore" Files
-#### Adding more to the .dockerignore File
+
+we can restrict what the `COPY` stanza copies, we can add ".dockerignore" file that won't be copied by the docker file when the image is being built. this is like ".gitignore".\
+the dot is an important part of the file name. 
+
+a good thing to ignore is the "node_modules" folder, which would protect us from overwriting the dependencies we got from `npm install`. we can also ignore the dockerfile itself, any git folders and anything that isn't required to run the application.
+
+
 #### Working with Environment Variables & ".env" Files
-#### Environment Variables & Security
+
+> "Docker support build-time arguments and runtime environment variables"
+
+arguments allow us to set flexible data that is matched with argument from the image build command with the *--build-arg* flag.
+
+environment variables are available to applications inside the container, we can set them in the dockerfile `ENV` or pass them into the container.
+
+for example, we could change the port that the server listens on to use environment variables.
+
+```js
+//app.listen(80);
+app.listen(process.env.PORT)
+```
+
+we can set the environment variable in the docker file
+```dockerfile
+ENV PORT 80
+EXPOSE $PORT
+```
+
+we can also change the environment variable when we run the container, with the *--env, -e* flag, which take a key:value pair. or pass a file with the environment variables by using *--env-file* flag
+```sh
+docker container run --env PORT=8003 <...>
+docker container run --env-file ./.env <...>
+```
+
+we should be careful with the data that we put into the dockerfile and the image, we don't want to add any private data inside,that means passwords, credentials, private keys and stuff.
+
 #### Using Build Arguments (ARG)
+
+Docker also has build time arguments, that effect image building, in our example, we have the default port hardcoded into the docker file. this is done with `ARG` stanza, which takes a name and a possible default value. this parameter can only be used during build stages, but not for runtime commands (such as `CMD`).
+the dollar sign means we are referring to a parameter.
+
+```dockerfile
+ARG DEFAULT_PORT=80
+ENV PORT $DEFAULT_PORT
+EXPOSE $PORT
+```
+
+when we build the image, we pass the value with the *--build-arg* flag so now the image uses this variable.
+```sh
+docker image build --build-arg DEFAULT_PORT=8000 .
+```
+
+because of how images are built (with layers), it's best to declare the arguments as late as possible, so we won't need to rebuild so much of the image for each change.
+
 #### Module Summary
-#### Module Resources
+
+> "Containers can read and write data, **Volumes** can help with data storage, **Bind Mounts** can help with direct container interaction."
+
+by default, data that is produced by the container is gone when the container finishes, to get the data out, we would want to use a volume. 
+
+> Volumes are folder on the host machine, managed by Docker, which are mounted into the container
+> - **Named Volumes** survive container removal and can therefore be used to store persistent data
+> - **Anonymous Volumes** are attached to a container - they can be used save (temporary) data inside the container.
+> - **Bind Mounts** are folders on the host machine which are specified by the user and mounted into containers (like named volumes).
+>     - we combine them with anonymous volumes to override specifications.
+
+> **Build Arguments** and **Runtime Environment** variables can be used to make images and containers more dynamic / configurable.
+
+build argument allow us to modify the image we build. environment variables effect the container instance itself.
+
+
+### Networking (Cross-) Container communication
+
+Now we will look at networks, how containers talk to one another, or how can containers connect with the local machine with http request or how the outside world can connect with the containers.
+
+#### Communication Types
+
+three forms of communication that our containers require.
+
+##### Case 1: Container to WWW Communication
+
+lets assume that we have an application in a docker container, and that this application wants to talk to the outside world, a site that isn't managed by us.
+
+we have the example in "networks-starting-setup", an app that uses the *axios* package to talk with an external api ("star wars api"), and fetches data from it.
+
+so if we use this node in a container, we must allow it to send and receive requests
+
+##### Case 2: Container to Local Host Machine Communication
+
+another kind of communication is to something on the host machine, like a webserver or a database. it's another application, but it doesn't run inside a container. in the application, we have a mongo database running, so we need to talk with it.
+
+##### Case 3: Container to Container Communication
+
+the last kind of communication is between containers, we can run a sql database on a container, and have another container talk to it. most applications use several containers together, each container does one thing. so one container runs the database, another runs the front end side of the app, and a different container runs the backend logic.
+
+#### Analyzing the Demo App
+
+lets look at the application. it has some dependencies and it runs a web api, it doesn't have a front end side with html responses.
+this API has four entry point
+- get - favorites
+- post - favorites
+- get - movies
+- get - people
+
+the "get movies" and "get people" use the external star wars api.
+we also need a mongo database, where we store data about our favorites. we communicate with the mongoDB by using the 'mongoose' package.
+
+we will use mongoDB in a container, we will also use *postman* to send the http requests.
+
+
+#### Creating a Container & Communicating to the Web (WWW)
+
+we will first dockerize this app. we have a dockerfile already. trying to run just this app fails because we don't have mongoDB.
+
+```sh
+docker image build -t favorites-node ./networks-starting-setup
+docker image ls
+docker container run -d --rm -p 3000:3000 --name sw favorites-node
+docker container ls -a
+docker container run --rm -p 3000:3000 --name sw favorites-node
+```
+we try commenting out the code that talks with mongodb to see if the other parts run. we build the image again and see that the other parts work, containers get access to the web right out of the box, we can send http requests to the external world.
+
+#### Making Container to Host Communication Work
+
+now we check if we can make a container talk to an app working on the local machine. if we had a mongodb running locally, we would want to talk with it.
+
+to fix this, we change our code and use a special address, we replace "localhost" with "host.docker.internal" this will work with any service, be it a an app or a web server on the local machine.
+
+#### Container to Container Communication: A Basic Solution
+
+communicating between containers. for this we need a container running mongodb.
+
+[MongoDB](https://hub.docker.com/_/mongo) has an official image we can use.
+
+we also need to change our code again, to make it talk to a dockerize container running the mongoDB.
+we can inspect the mongoDB container and check the ip address of the container.
+
+```sh
+docker container run --rm -d --name mongodb mongo
+docker container inspect mongodb
+```
+
+we can try changing the address in the code and hard coding it. this will work, but is a bad solution, we can't be sure that the mongoDB will always run on the same ip. and we had to change the image.
+
+#### Introducing Docker Networks: Elegant Container to Container Communication
+
+we can multiple containers running on the same docker network, we do this with the *--network* flag, which makes all containers running on the same network able to talk to one another.
+
+we need to change the code again to make the application able to talk to other, docker gives us an internal DNS, so we can use the container name in the code to talk to other application. we just need to build the image again...
+```js
+mongoose.connect(
+  //'mongodb://localhost:27017/swfavorites',
+  //'mongodb://host.docker.internal:27017/swfavorites',
+  'mongodb://mongodb:27017/swfavorites',
+  { useNewUrlParser: true },
+  (err) => {
+    if (err) {
+      console.log(err);
+    } else {
+      app.listen(3000);
+    }
+  }
+);
+
+```
+
+networks aren't created by running a container (named volumes are...), we must create them before.
+```sh
+docker network create my_network
+docker container run --rm -d --network my_network --name mongodb mongo
+docker container inspect mongodb --format "{{json .NetworkSettings.Networks }}"
+docker container run --rm -d -p 3000:3000 --network my_network --name sw favorites-node
+```
+
+we don't have to add published port to the mongoDB container, as it is only talking to stuff inside the network, it doesn't go outside or talks to external apis.
+
+docker doesn't replace source code to replace stuff, it has an internal dns that resolves addresses.
+
+#### Docker Network Drivers
+
+there is an additional flag to the `docker network create` command, the *--driver, -d* flag with one of the following options:
+
+- *bridge* (default) - containers on the same network find each other.
+- *host* - for standalone containers, the container shares the same network as the local host
+- *overlay* - parts of the swarm orchestration mode
+- *macvlan* - custom MAC address
+- *none* - no networking
+- (others, 3rd party tools) - extensions
+  
+#### Module Summary
+
+we can combine networks and volumes to store persistent data. most applications use more than one container.
+
+Connection | notes
+----|------|
+Container to outside net | works out of the box
+Container to local machine | requires code changes - replace **"localhost"** with **"host.docker.internal"**
+Container to Container | use docker networks
+
+## Practical Application Usage
+(includes sections 5,)
+### Building Multi-Container Applications with Docker
