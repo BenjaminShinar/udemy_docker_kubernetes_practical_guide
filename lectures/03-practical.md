@@ -191,7 +191,7 @@ now when we start this database, the backend fails to fetch the data, because it
 
 ```js
 //'mongodb://mongodb:27017/course-goals',
-'mongodb://max:secret@mongodb:27017/course-goals?authSource=admin',
+'mongodb://[user]:[password]@mongodb:27017/course-goals?authSource=admin',
 ```
 if we try this again, things will work for us.
 in the real world, we should somehow also pass those two as parts of the environment
@@ -234,7 +234,7 @@ ENV MONGODB_PASSWORD=secret
 and now we change the code to use those variables dynamically.
 
 ```js
-//'mongodb://max:secret@mongodb:27017/course-goals?authSource=admin',
+//'mongodb://[user]:[password]@mongodb:27017/course-goals?authSource=admin',
 `mongodb://${process.env.MONGODB_USERNAME}:${process.env.MONGODB_PASSWORD}@mongodb:27017/course-goals?authSource=admin`,
 ```
 we build the image again, and now run the container with the *--env* flag.
@@ -254,6 +254,22 @@ Dockerfile
 we build the image again, and continue to work on the react frontend service.l
 
 #### Live Source Code Updates for the React Container (with Bind Mounts)
+
+in the react code, we also want to allow for live source updates. we need bind mounts as well. there is no need to use nodemon in react.
+
+```sh
+docker container run -v "D:\Docker_Kubernetes_The_Practical_Guide\multi-01-starting-setup\frontend\src:/app/src" --name goals-frontend --rm -p 3000:3000 -it goals-react
+```
+
+eventually this works. if we want live update, we need to follow the article attached and use a linux based file system.
+(not going to do this)
+
+our frontend image takes longer to build. we don't want this. we can use another *.dockerignore* file to reduce the amount of work we do.
+
 #### Module Summary
+
+we managed to dockerize our three components, we encountered some problems and fixed them. this section was aimed for development setup, rather than production.
+
+we turned out to have three long docker container run commands, we would like to somehow reduce this. this is the topic of the next section.
 
 </details>
