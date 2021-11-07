@@ -234,10 +234,13 @@ ENV MONGODB_PASSWORD=secret
 ```
 
 and now we change the code to use those variables dynamically.
+we access them with `{}
 
 ```js
-//'mongodb://[user]:[password]@mongodb:27017/course-goals?authSource=admin',
-`mongodb://${process.env.MONGODB_USERNAME}:${process.env.MONGODB_PASSWORD}@mongodb:27017/course-goals?authSource=admin`,
+const userName = process.env.MONGODB_USERNAME;
+const password =process.env.MONGODB_PASSWORD;
+//'mongodb://user-then-collins-then-password@mongodb:27017/course-goals?authSource=admin',
+`mongodb://{user-then-collins-then-password@mongodb:27017/course-goals?authSource=admin`,
 ```
 we build the image again, and now run the container with the *--env* flag.
 
