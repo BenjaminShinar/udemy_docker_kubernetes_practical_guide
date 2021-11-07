@@ -21,6 +21,7 @@ based on the udemy course [Docker & Kubernetes: The Practical Guide](https://www
 [Practical Application Usage](lectures/03-practical.md)
 
 - Building a Multi Container Application
+- Using Docker-Compose
 
 
 
