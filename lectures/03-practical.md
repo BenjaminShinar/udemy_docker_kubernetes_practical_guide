@@ -187,11 +187,13 @@ another requirement was to add security. this is done with two environment varia
 ```sh
 docker container run --name mongodb --rm -d --network goals-network --volume goals-data:/data/db -e MONGO_INITDB_ROOT_USERNAME=max -e MONGO_INITDB_ROOT_PASSWORD=secret mongo
 ```
-now when we start this database, the backend fails to fetch the data, because it doesn't use the correct authorization. to fix this, we add the can add user name and password to the connection string in the backend. these were optional so far, but now are required. we also need a `?authSource=admin` at the end of the connection string
+now when we start this database, the backend fails to fetch the data, because it doesn't use the correct authorization. to fix this, we add the can add user name and password to the connection string in the backend. these were optional so far, but now are required. we also need a `?authSource=admin` at the end of the connection string.
+
+
 
 ```js
 //'mongodb://mongodb:27017/course-goals',
-'mongodb://[user]:[password]@mongodb:27017/course-goals?authSource=admin',
+'mongodb://[userThenCollinsThenPassword]@mongodb:27017/course-goals?authSource=admin',
 ```
 if we try this again, things will work for us.
 in the real world, we should somehow also pass those two as parts of the environment
