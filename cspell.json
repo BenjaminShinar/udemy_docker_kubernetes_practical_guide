@@ -4,10 +4,15 @@
     "dictionaryDefinitions": [],
     "dictionaries": [],
     "words": [
+        "DockerHub",
+        "Dockerizing",
         "Kubernetes",
-        "WORKDIR",
-        "DockerHub"
+        "WORKDIR"
     ],
-    "ignoreWords": ["Schwarzmüller","Academind","dockerignore"],
+    "ignoreWords": [
+        "Schwarzmüller",
+        "Academind",
+        "dockerignore"
+    ],
     "import": []
 }
