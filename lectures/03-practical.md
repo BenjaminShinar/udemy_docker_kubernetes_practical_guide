@@ -1,12 +1,12 @@
 <!--
 ignore these words in spell check for this file
-// cSpell:ignore INITDB dockerized
+// cSpell:ignore INITDB dockerized drwxr cliuser userdel adduser addgroup gecos laravel
 -->
 
 [Menu](../README.md)
 
 ## Practical Application Usage
-(includes sections 5,6,7)
+(includes sections 5,6,7,8)
 
 ### Building Multi-Container Applications with Docker
 
@@ -490,5 +490,220 @@ image specification | image: | can be tagged, a url, etc
 *--publish*| ports: | list form
 *-it* | stdin_open:, tty: | the  cli flag is actually two flags combined, so two keys are fair game
 *--name* | container_name: | probably not worth using
+
+</details>
+
+### Working with Utility Containers
+
+<details>
+<summary>
+Using Containers as an environment rather than an application.
+</summary>
+
+a deeper dive into the usage of containers. not just running applications. "utility containers" are containers that we run because of their environment, which we can use to run additional commands.
+
+#### Utility Containers: Why Would You Use Them?
+
+imagine that we want to run a node app in a container? we first need to create the source code. this usually means setting up a project with `npm init`, which will create a "package.json" file. but we want everything to be dockerized, we don't want to install node js and all those libraries! this is a case where using containers as "utility containers" can shine.
+
+#### Different Ways of Running Commands in Containers
+
+we can run the node image in an interactive mode. which opens up the node environment for REPL. we can also run the container in an interactive mode but detached, and then use the `exec` command with the *-it* flag to run a command from outside the container. we can also use `exec` to run commands without interrupting the running behavior of the container.
+```sh
+docker container run --rm -it node 
+docker container run --name nodejs -d --rm -it node 
+docker container exec -it nodejs npm init
+```
+
+another option is to change the basic command of the container, so rather than starting in the default command, we start with some other command.
+```sh
+docker container run --rm -it node npm init
+```
+
+#### Building a First Utility Container
+
+lets create something for ourselves.
+
+```dockerfile
+FROM node:14-alpine
+
+WORKDIR /app
+```
+
+now we build the image and use it with a bind mount to create the node project on a local folder without having to install the node packages!
+
+```sh
+docker image build -t node-utility
+docker container run --rm -it -v "${pwd}/node:/app" node-utility npm init
+```
+
+this isn't just for nodejs, it also helps with other programming stacks, such as php and laravel, and many others.
+
+#### Utilizing ENTRYPOINT
+
+what if we want to make our container limited to only **"npm"** commands? for these, we use the `ENTRYPOINT` stanza. when we run a container, if we add a command after the image name, that command overrides the command in the `CMD` stanza. if we have an `ENTRYPOINT` stanza, then anything we have after the image name is appended to what we wrote.
+
+```dockerfile
+FROM node:14-alpine
+
+WORKDIR /app
+
+ENTRYPOINT ["npm"]
+```
+and now we run the container again with just the 'init' after the image name. we therefore limit the use of this image to only **"npm"** commands.
+
+```sh
+docker image build -t node-utility
+docker container run --rm -it -v "${pwd}/node:/app" node-utility init
+docker container run --rm -it -v "${pwd}/node:/app" node-utility install express --save
+```
+
+the downside is that we are back to running long commands from the terminal, didn't we want to move to docker-compose to avoid that?
+
+#### Using Docker Compose
+
+we already said that docker-compose can also help us with single container applications.
+```yaml
+version: "3.8"
+services:
+  npm:
+    build: ./
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./:/app  
+```
+
+if we spin the services right now, things won't work for us, we need some way to use them. docker-compose has two additional commands we can use `exec` which allows us to run commands on already running containers, and `run`, which allows us to run a single service from the yaml. we simply specify the service name and the arguments we wish to add.
+
+```sh
+docker-compose up
+docker-compose down
+docker-compose run npm init
+docker-compose run --rm npm init
+```
+when we start services with `docker-compose up` it is automatically removed, but no for `docker-compose run`. we can fix this by adding the *--rm* flag
+
+#### Utility Containers, Permissions & Linux
+
+some thread about linux utility containers, copied here in it's entirety.
+[Utility Containers and Linux](https://www.udemy.com/course/docker-kubernetes-the-practical-guide/#questions/12977214/)
+
+> This is truly an awesome course Max! Well done! \
+> I wanted to point out that on a Linux system, the Utility Container idea doesn't quite work as you describe it.  In Linux, by default Docker runs as the "Root" user, so when we do a lot of the things that you are advocating for with Utility Containers the files that get written to the Bind Mount have ownership and permissions of the Linux Root user.  (On MacOS and Windows10, since Docker is being used from within a VM, the user mappings all happen automatically due to NFS mounts.)
+>
+> So, for example on Linux, if I do the following (as you described in the course):
+> ``` Dockerfile 
+> FROM node:14-slim
+> WORKDIR /app
+> ```
+> ```sh
+> docker build -t node-util:perm .
+> docker run -it --rm -v $(pwd):/app node-util:perm npm init
+>  ls -la
+> ```
+> 
+> ```
+> total 16
+> drwxr-xr-x  3 scott scott 4096 Oct 31 16:16 ./
+> drwxr-xr-x 12 scott scott 4096 Oct 31 16:14 ../
+> drwxr-xr-x  7 scott scott 4096 Oct 31 16:14 .git/
+> -rw-r--r--  1 root  root   202 Oct 31 16:16 package.json
+> ```
+>
+> You'll see that the ownership and permissions for the package.json file are "root".  But, regardless of the file that is being written to the Bind Mounted volume from commands emanating from within the docker container, e.g. "npm install", all come out with "Root" ownership.
+> 
+> -------
+>
+> Solution 1:  Use  predefined "node" user (if you're lucky)\ 
+> There is a lot of discussion out there in the docker community (devops) about security around running Docker as a non-privileged user (which might be a good topic for you to cover as a video lecture - or maybe you have; I haven't completed the course yet).  The Official Node.js Docker Container provides such a user that they call "node". 
+> https://github.com/nodejs/docker-node/blob/master/Dockerfile-slim.template
+> ```Dockerfile
+> FROM debian:name-slim
+> RUN groupadd --gid 1000 node          
+> && useradd --uid 1000 --gid node --shell /bin/bash --create-home node
+> ```
+> 
+> Luckily enough for me on my local Linux system, my "scott" uid:gid is also 1000:1000 so, this happens to map nicely to the "node" user defined within the Official Node Docker Image.
+> 
+> So, in my case of using the Official Node Docker Container, all I need to do is make sure I specify that I want the container to run as a non-Root user that they > make available.  To do that, I just add:
+> 
+> ```Dockerfile
+> FROM node:14-slim
+> USER node
+> WORKDIR /app
+> ```
+>
+> If I rebuild my Utility Container in the normal way and re-run "npm init", the ownership of the package.json file is written as if "scott" wrote the file.
+> ```sh
+> $ ls -la
+> ```
+> ```
+> total 12
+> drwxr-xr-x  2 scott scott 4096 Oct 31 16:23 ./
+> drwxr-xr-x 13 scott scott 4096 Oct 31 16:23 ../
+> -rw-r--r--  1 scott scott 204 Oct 31 16:23 package.json
+> ```
+> 
+> Solution 2:  Remove the predefined "node" user and add yourself as the user\
+> However, if the Linux user that you are running as is not lucky to be mapped to 1000:1000, then you can modify the Utility Container Dockerfile to remove the predefined "node" user and add yourself as the user that the container will run as:
+> 
+> ```Dockerfile
+> FROM node:14-slim
+> RUN userdel -r node
+> ARG USER_ID
+> ARG GROUP_ID
+> RUN addgroup --gid $GROUP_ID user
+> RUN adduser --disabled-password --gecos '' --uid $USER_ID --gid $GROUP_ID user
+> USER user
+> WORKDIR /app
+> ```
+> 
+> And then build the Docker image using the following (which also gives you a nice use of ARG):
+> ```sh
+>  docker build -t node-util:cliuser --build-arg USER_ID=$(id -u) --build-arg GROUP_ID=$(id -g) .
+> ```
+> And finally running it with:
+> ```sh
+>  docker run -it --rm -v $(pwd):/app node-util:cliuser npm init
+> $ ls -la
+> ```
+> ```
+> total 12
+> drwxr-xr-x  2 scott scott 4096 Oct 31 16:54 ./
+> drwxr-xr-x 13 scott scott 4096 Oct 31 16:23 ../
+> -rw-r--r--  1 scott scott  202 Oct 31 16:54 package.json
+> ```
+>  Reference to Solution 2 above: https://vsupalov.com/docker-shared-permissions/
+> 
+> Keep in mind that this image will not be portable, but for the purpose of the Utility Containers like this, I don't think this is an issue at all for these "Utility Containers"
+
+
+#### Module Summary
+
+we discussed the ways that we can use containers for the runtime environment, we can use docker containers as a way to get their abilities without installing the libraries on the local machine.
+</details>
+
+### A More Complex Setup: Laravel and PHP Dockerized Project
+
+<!-- <details> -->
+<summary>
+
+</summary>
+
+in this module we will practice what we learned so far, and discover some new abilities of docker-compose. we will do so by using a combination of PHP and Laravel, we will create a dockerized application this time. Laravel and PHP generally require a lengthy setup, so that's why using docker will be very helpful.
+
+#### The Target Setup
+#### Adding a Nginx (Web Server) Container
+#### Adding a PHP Container
+#### Adding a MySQL Container
+#### Adding a Composer Utility Container
+#### Creating a Laravel App via the Composer Utility Container
+#### Fixing Errors With The Next Lecture
+#### Launching Only Some Docker Compose Services
+#### Adding More Utility Containers
+#### Docker Compose with and without Dockerfiles
+#### Bind Mounts and COPY: When To Use What
+#### Module Resources
 
 </details>

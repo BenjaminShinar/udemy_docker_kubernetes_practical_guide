@@ -4,9 +4,14 @@
     "dictionaryDefinitions": [],
     "dictionaries": [],
     "words": [
+        "Dockerfiles",
         "DockerHub",
         "Dockerizing",
+        "ENTRYPOINT",
+        "HEALTHCHECK",
         "Kubernetes",
+        "ONBUILD",
+        "STOPSIGNAL",
         "WORKDIR"
     ],
     "ignoreWords": [

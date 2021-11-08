@@ -22,10 +22,15 @@ based on the udemy course [Docker & Kubernetes: The Practical Guide](https://www
 
 - Building a Multi Container Application
 - Using Docker-Compose
+- Utility Containers
+- Complex PHP project
 
 
 
-Issues:
+
+
+## Special Takeaways
+
 - when trying to get live server in windows with nodemon we need to add *-L* to the script to make it work.
   ```json 
   "scripts": {
@@ -34,3 +39,63 @@ Issues:
   },
   ```
 - a
+
+## Dockerfile 
+
+[Reference](https://docs.docker.com/engine/reference/builder/)
+
+Stanza | format | usages | note
+------------|---------|--------|----
+FROM | image:tag | base image | NA
+WORKDIR | directory | move to folder | create if needed
+COPY | source destination | copy contents | NA
+RUN | shell command | installing packages, | NA
+ENV | name=value | environment variables | NA
+ARG | name=default value | build time variables | *--build-arg* in docker image build
+EXPOSE | port number | expose port | optional?
+VOLUME | location inside image | anonymous volume?| optional
+CMD | ["shell","command"] | image starting command | NA
+ENTRYPOINT | ["shell","command"] | entry point when passing a command | limit what we can do with the container. similar to `CMD` in some ways
+ADD |
+USER |
+ONBUILD |
+STOPSIGNAL |
+HEALTHCHECK |
+SHELL |
+
+## Docker-Compose
+
+docker-compose.yaml file [Reference](https://docs.docker.com/compose/compose-file/compose-file-v3/)
+- version:
+- services:
+  - \<service name>:
+    - image:
+    - build:
+      - context:
+      - dockerfile:
+      - args:
+        - key:value format
+    - stdin_open: \<boolean>
+    - tty: \<boolean>
+    - volumes:
+      - list of volume patterns (anonymous, named, bind mounts)
+    - environment:
+      - variable:value (key:value format) OR list of variable=value entires
+    - env_file:
+      - list of \<file location>
+    - ports
+      - list of "\<external>:\<internal>" ports
+    - networks
+      - list of networks
+    - depends on
+      - list of services that need to be up before this one
+- networks:
+  - \<network name>:
+- volumes:
+  - named volumes \<volume name>:
+
+commands
+- up
+- down
+- run \<service name> \<arguments>
+- exec
