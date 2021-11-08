@@ -1,6 +1,6 @@
 <!--
 ignore these words in spell check for this file
-// cSpell:ignore  dockerized 
+// cSpell:ignore dockerized 
 -->
 
 [Menu](../README.md)
@@ -8,6 +8,10 @@ ignore these words in spell check for this file
 ## Deploying Docker Containers
 (includes section 9)
 
+This module will be about deploying containers, moving from development to production. we will run containers on remote machines, like the cloud.\
+the focus will be on web app development, even though docker can be used for any kind of application.
+
+we will learn to move from local development to remote deployment, both single and multi containers, use one or many machines to host the containers, we will also learn about managed and un-managed services. the examples in the course are for amazon's AWS.
 
 #### From Development To Production
 #### Deployment Process & Providers
