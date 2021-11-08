@@ -25,7 +25,9 @@ based on the udemy course [Docker & Kubernetes: The Practical Guide](https://www
 - Utility Containers
 - Complex PHP project
 
+[Docker Container Deployment](lectures/04-deployment.md)
 
+- Deploying
 
 
 
@@ -38,9 +40,14 @@ based on the udemy course [Docker & Kubernetes: The Practical Guide](https://www
     "start":"nodemon -L app.js"
   },
   ```
-- a
+- for the MYSQL service, i might have to add an environment variable "MYSQL_ALLOW_EMPTY_PASSWORD=true" to make it not exit immediately.
 
 ## Dockerfile 
+
+<details>
+<summary>
+Dockerfile
+</summary>
 
 [Reference](https://docs.docker.com/engine/reference/builder/)
 
@@ -62,10 +69,16 @@ ONBUILD |
 STOPSIGNAL |
 HEALTHCHECK |
 SHELL |
+</details>
 
 ## Docker-Compose
 
-docker-compose.yaml file [Reference](https://docs.docker.com/compose/compose-file/compose-file-v3/)
+<details>
+<summary>
+docker-compose.yaml file
+</summary>
+
+[Reference](https://docs.docker.com/compose/compose-file/compose-file-v3/)
 - version:
 - services:
   - \<service name>:
@@ -79,6 +92,7 @@ docker-compose.yaml file [Reference](https://docs.docker.com/compose/compose-fil
     - tty: \<boolean>
     - volumes:
       - list of volume patterns (anonymous, named, bind mounts)
+      - can be suffixed with ":ro" or ":delegated"
     - environment:
       - variable:value (key:value format) OR list of variable=value entires
     - env_file:
@@ -89,6 +103,8 @@ docker-compose.yaml file [Reference](https://docs.docker.com/compose/compose-fil
       - list of networks
     - depends on
       - list of services that need to be up before this one
+    - working_dir: override dockerfile 
+    - entrypoint: override dockerfile
 - networks:
   - \<network name>:
 - volumes:
@@ -99,3 +115,4 @@ commands
 - down
 - run \<service name> \<arguments>
 - exec
+</details>
