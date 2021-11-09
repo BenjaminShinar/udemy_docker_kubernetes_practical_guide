@@ -28,6 +28,14 @@ based on the udemy course [Docker & Kubernetes: The Practical Guide](https://www
 [Docker Container Deployment](lectures/04-deployment.md)
 
 - Deploying
+  - Un-manage Manual Deployment (AWS EC2)
+  - Managed Deployment (AWS ECS)
+  - Multi-Stage Build
+- Summary
+
+[Kubernetes](lectures/05-kubernetes.md)
+
+- Getting started
 
 
 
@@ -42,6 +50,20 @@ based on the udemy course [Docker & Kubernetes: The Practical Guide](https://www
   ```
 - for the MYSQL service, i might have to add an environment variable "MYSQL_ALLOW_EMPTY_PASSWORD=true" to make it not exit immediately.
 
+## Docker Cli
+
+<details>
+<summary>
+docker commands
+</summary>
+
+docker container run
+- *--pull "always|missing|never"*  - the quotes don't matter, we can skip them. "missing" is default.
+- *--workdir,-w "folder path"* - overwrite working directory
+
+</details>
+
+
 ## Dockerfile 
 
 <details>
@@ -53,7 +75,7 @@ Dockerfile
 
 Stanza | format | usages | note
 ------------|---------|--------|----
-FROM | image:tag | base image | NA
+FROM | image:tag | base image | add `as` to label step
 WORKDIR | directory | move to folder | create if needed
 COPY | source destination | copy contents | NA
 RUN | shell command | installing packages, | NA
@@ -61,7 +83,7 @@ ENV | name=value | environment variables | NA
 ARG | name=default value | build time variables | *--build-arg* in docker image build
 EXPOSE | port number | expose port | optional?
 VOLUME | location inside image | anonymous volume?| optional
-CMD | ["shell","command"] | image starting command | NA
+CMD | ["shell","command"] | image starting command | `--from=step`
 ENTRYPOINT | ["shell","command"] | entry point when passing a command | limit what we can do with the container. similar to `CMD` in some ways
 ADD |
 USER |
@@ -69,6 +91,8 @@ ONBUILD |
 STOPSIGNAL |
 HEALTHCHECK |
 SHELL |
+
+
 </details>
 
 ## Docker-Compose
