@@ -35,7 +35,8 @@ based on the udemy course [Docker & Kubernetes: The Practical Guide](https://www
 
 [Kubernetes](lectures/05-kubernetes.md)
 
-- Getting started
+- Kubernetes Concepts
+- 
 
 
 

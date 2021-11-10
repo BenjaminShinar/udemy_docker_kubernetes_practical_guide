@@ -9,7 +9,12 @@
         "Dockerizing",
         "ENTRYPOINT",
         "HEALTHCHECK",
+        "kube",
+        "kubectl",
+        "kubelet",
+        "Kubelets",
         "Kubernetes",
+        "minikube",
         "ONBUILD",
         "STOPSIGNAL",
         "WORKDIR"
