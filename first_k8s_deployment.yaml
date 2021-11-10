@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: test-app-2
+    labels:
+        group: example
+spec:
+    replicas: 3
+    selector:
+        matchLabels:
+            app: second-app
+            tier: backend
+    template:
+        metadata:
+            labels:
+                app: second-app
+                tier: backend
+        spec:
+            containers:
+                - name: second-node-app
+                  image: nginx:alpine
+                  livenessProbe:
+                    httpGet:
+                        path: /
+                        port: 8080
+                        #httpHeader:
+                    periodSeconds: 3
+                    initialDelaySeconds: 5

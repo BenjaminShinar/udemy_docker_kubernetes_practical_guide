@@ -1,6 +1,6 @@
 <!--
 ignore these words in spell check for this file
-// cSpell:ignore udemy
+// cSpell:ignore udemy hyperv
 -->
 
 # Docker & Kubernetes: The Practical Guide
@@ -36,6 +36,7 @@ based on the udemy course [Docker & Kubernetes: The Practical Guide](https://www
 [Kubernetes](lectures/05-kubernetes.md)
 
 - Kubernetes Concepts
+- Kubernetes in Action - Diving into the Core Concepts
 - 
 
 
@@ -140,4 +141,63 @@ commands
 - down
 - run \<service name> \<arguments>
 - exec
+</details>
+
+
+## Kubectl
+
+<details>
+<summary>
+kubectl commands
+</summary>
+
+</details>
+
+- *create \<resource> \<name>* 
+  - *deployment*
+    - *--image*
+- *expose deployment \<name>*
+  - *--port=*
+  - *--type=* - ClusterIP, NodePort, LoadBalancer
+- *get*
+  - *deployment*
+  - *pods*
+  - *services*
+  - *all*
+- *scale*
+  - *--replicas=5*
+- *rollout*
+  - *undo*
+    - *--to-revision*
+  - *history*
+    - *revision=1*
+- *apply*
+  - *--filename, -f* - which file to use
+
+*--selector, -l* - select with key:value, we can limit to kind.
+## Minikube
+
+<details>
+<summary>
+minikube commands
+</summary>
+
+- *start*
+  - *--driver=docker|hyperv*
+- *delete*
+- *status*
+- *dashboard*
+- *service* - get ip to use
+</details>
+
+## Shell
+
+<details>
+<summary>
+shell commands
+</summary>
+
+```sh
+$env:path
+```
 </details>
