@@ -1,12 +1,12 @@
 <!--
 ignore these words in spell check for this file
-// cSpell:ignore Kubermatic systeminfo USERPROFILE mkdir hyperv rootkey
+// cSpell:ignore Kubermatic systeminfo USERPROFILE mkdir hyperv rootkey  configmap benjaminshinar
 -->
 
 [Menu](../README.md)
 
 ## Kubernetes
-(includes sections 11,12)
+(includes sections 11,12,13)
 
 ### Getting Started With Kubernetes
 
@@ -106,9 +106,9 @@ core concepts we should keep in mind:
 
 ### Kubernetes in Action - Diving into the Core Concepts
 
-<!-- <details> -->
+<details>
 <summary>
-
+Actually using kubernetes
 </summary>
 
 setting a Kubernetes environments, working with Kubernetes objects and deploying an actual example.
@@ -501,4 +501,427 @@ we used minikube to run local cluster, we first used imperative style, and later
 
 we also saw the service types: clusterIP, nodePort and LoadBalancer, and we looked at how selectors work.
 
+</details>
+
+
+### Managing Data & Volumes With Kubernetes
+
+<details>
+<summary>
+Storing Data across runs with volumes and persistent data.
+</summary>
+
+even if we deploy on the cloud, we still have the same problems as we had with local deployment.
+we still want persistent data, so we need to bring volumes to the cloud.
+
+#### Starting Project & What We Know Already
+
+we have a example project in the "kub-data-01-starting-setup" folder. we have two entry point, `GET` and `POST` to "/story". the data should survive across deployments.
+we can test this app locally with docker compose
+```sh
+cd kub-data-01-starting-setup
+docker-compose up -d --build
+```
+
+and now we can test this with postman or with a local tool (curl)
+```sh
+curl --location --request POST 'localhost/story' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "text": "my text11"
+}'
+curl --location --request GET 'localhost/story'
+Invoke-RestMethod 'localhost/story' -Method 'GET' -Headers $headers | ConvertTo-Json 
+```
+we can stop and restart the app and the data will still be there, because we are using volumes.
+
+```sh
+docker-compose down
+docker-compose up -d
+curl --location --request GET 'localhost/story'
+```
+if we want to remove the data, we need to remove the volume itself
+```sh
+docker volume ls
+docker volume rm kub-data-01-starting-setup_stories
+```
+now we would want to use the same thing on remote deployment
+
+#### Kubernetes & Volumes - More Than Docker Volumes
+
+there is a term that we use sometimes "state", this refers to data that is created and used by the application and shouldn't be lost.
+the data can be 'persistent' or intermediate data, we want this data to remain even if the container is removed. persistent data should be stored in a database (such as user generated data), but also intermediate might need to consist.
+
+in the kubernetes world, we still need the data. so we still need volumes and some way to retain the data. so we need to configure kubernetes to run the containers with the appropriate volumes.
+
+
+#### Kubernetes Volumes: Theory & Docker Comparison
+
+luckily, kubernetes can mount volumes onto containers, just like local docker, kubernetes supports a wide variety of volume types and drivers: like "local" volumes (which live on the nodes), or cloud-vendor specific volumes. the lifetime of the volume is linked to the **pods** lifetime. it survives containers removal and restarts, but not pod actions.
+
+kubernetes volume are similar but different from docker volumes, we have more support for storage and driver types, it's more flexible.
+
+<> | Docker Volume | Kubernetes Volume
+----|---------|---
+Driver and type support | Basically no driver / Type support | Supports many different drivers and types
+Volumes persistency | Volume persist until manually cleared | Volumes are not necessarily persistent
+Volume Lifetime | Volumes survive Container restarts and removals | Volumes survive Container restarts and removals
+
+#### Creating a New Deployment & Service
+
+lets do this step by step, we need to make this into a deployment.
+
+we need a deployment and service yaml files, lets start writing them, just as before.
+
+**deployment.yaml**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: story-deployment
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app: story
+    template:
+        metadata:
+            labels:
+                app: story
+        spec:
+            containers:
+                - name: story
+                  image: benjaminshinar/kub-data-demo
+```
+**service.yaml**
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+    name: story-service
+spec:
+    selector:
+        app: story
+    ports:
+        - protocol: 'TCP'
+          port: 80 #external
+          targetPort: 3000 #inside the container
+    type: LoadBalancer
+```
+
+but we first need to push the image to the docker repository.
+
+```sh
+docker login
+docker image build -t benjaminshinar/kub-data-demo . 
+docker image tag benjaminshinar/kub-data-demo benjaminshinar/kub-data-demo:0.1
+docker image push benjaminshinar/kub-data-demo:0.1
+```
+
+and lets see if it works
+```sh
+minikube status
+minikube start --driver=docker
+minikube status
+#in new terminal
+minikube dashboard
+
+kubectl apply -f service.yaml -f deployment.yaml
+kubectl get deployment
+#expose
+minikube service story-service
+
+```
+now that we have the url, we can use it in postman and get a valid response.
+
+#### Getting Started with Kubernetes Volumes
+
+the problem is that the data isn't persistent. if we can crush the pods, then we will lose the data. to fix this, we need to somehow use volumes. kubernetes supports a variety of volume types and drivers. not just local storage on the nodes, we also have cloud vendor specific storage.
+
+we will look at three types, **emptyDir**,**hostPath** and **CSI**, all these types don't change how the volume works inside the container, but they dictate how the data is stored outside the container.
+
+[volume types](https://kubernetes.io/docs/concepts/storage/volumes/)
+
+#### A First Volume: The "emptyDir" Type
+
+the volume life time depends on the pod, not the container.
+
+```sh
+Invoke-RestMethod 'http://127.0.0.1:50261/story' -Method 'GET' -Headers $headers | convertTo-Json
+#delete pod
+kubectl get pods
+kubectl delete pods <pod name>
+
+#wait for kubernetes to redeploy the pod
+kubectl get pods
+
+# check again, now the data is gone
+Invoke-RestMethod 'http://127.0.0.1:50261/story' -Method 'GET' -Headers $headers | convertTo-Json
+```
+
+we have to define the volumes in the same place we define the pods.
+we will also add an error route that crushes the app for us
+
+```js
+app.get('/error',()=>{
+    process.exit(1);
+});
+```
+
+we can rebuild the image with the new code, specify the tag in the deployment file and apply to get this running
+```sh
+docker image build -t benjaminshinar/kub-data-demo:0.2 -t benjaminshinar/kub-data-demo .
+docker image push benjaminshinar/kub-data-demo
+docker image push benjaminshinar/kub-data-demo:0.2 
+kubectl apply -f .deployment.yaml
+```
+now we can make request to the "/error" path and crush the app, which makes us lose the data! the container restarted, but not the pod.
+
+we can try fixing this by adding the volume in the deployment spec, an *emptyDir* (empty directory) that remains in the pod, and outlives containers. we also define the *volumeMounts* key in the container objects
+
+**deployment.yaml**
+```yaml
+        spec:
+            containers:
+                - name: story
+                  image: benjaminshinar/kub-data-demo:0.2
+                  volumeMounts:
+                    - mountPath: /app/story #internal
+                      name: story-volume #what volume we use.
+            volumes:
+                - name: story-volume
+                  emptyDir: {}
+```
+we can try this again and see if the data survives! but we first get an "file doesn't exist". we can do a post request to create the data and then things work.
+
+
+#### A Second Volume: The "hostPath" Type
+
+the emptyDir is valid way, but what if we have two replicas? if one pod fails then stuff doesn't work. the "hostPath" type host the data on the machine, rather than on the pod. this is more similar to a bindMount.
+
+we provide a path on the host machine (the node) and how to access it.
+
+**deployment.yaml**
+```yaml
+        spec:
+            containers:
+                - name: story
+                  image: benjaminshinar/kub-data-demo:0.2
+                  volumeMounts:
+                    - mountPath: /app/story #internal
+                      name: story-host-path-volume #what volume we use.
+            volumes:
+                - name: story-volume
+                  emptyDir: {}
+                - name: story-host-path-volume
+                  hostPath:
+                    path: /data #path on the host machine
+                    type: DirectoryOrCreate
+```
+
+again this fails until we start writing, but if we crush one pod, we can still get the data from the other pods, because they all share the same data inside the host machine.
+
+when we run this locally, we really have one worker node, but in real deployment, we have many remote machines, so the data won't really be shared between replicas. ths volume is also useful if we want to use existing data.
+
+#### Understanding the "CSI" Volume Type
+
+another type of volume is CSI - Container Storage Interface, this type is very flexible, it is a late addition to kubernetes, which was done to provide a single entry point for volumes without requiring more specific types to be added.
+
+we can add any storage solution directly. it just needs to have a compatible CSI interface. we won't use it here, but later on in the course.
+
+#### From Volumes to Persistent Volumes
+
+so far we used volumes that follow the lifetime of the pod or the machine. we need something that outlives pods and nodes, like a database container or files. some data must persist across time.
+
+kubernetes has **persistent volumes**, which are pod and nodes independent.
+some of the volumes builtin already give us volume persistency because the data is stored somewhere else. but the Persistent volumes are declared to be such and have some more characteristics, they are detached from the pods and nodes, and the are supervised as part of the cluster, and we can use them from any resource with defining them again.
+
+persistent volumes are entities in the cluster, independent from the nodes and pods, the nodes hold PV claims that give them access to the volumes, but they don't own the volumes and the data is stored outside of the nodes.
+
+if we look at the time of persistent volumes, we see that emptyDir is missing and HostPath is noted to be suited only for testing. we see a lot of cloud storage options and the CSI type again.
+
+#### Defining a Persistent Volume
+
+again, we will use HostPath as an example for a persistent volume, even if we won't use it in the read world. we need a new configuration file, with some other stuff defined.
+
+volume mode: filesystem  vs block\
+accessMode: we can define more than one, and then decide when we claim it
+- ReadWriteOnce - can be mounted by one node, and be used all the pods in it.
+- ReadOnlyMany - readonly, but can be used by multiple nodes
+- ReadWriteMany - read and write, can be used by all nodes.
+  
+**host-pv.yaml**:
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+    name: story-host-pv
+spec:
+    capacity:
+        storage: 4Gi
+    volumeMode: Filesystem #or Block
+    accessMode: 
+        - ReadWriteOnce
+        #- ReadOnlyMany
+        #- ReadWriteMany
+    hostPath:
+        path: /data
+        type: DirectoryOrCreate
+```
+
+now we defined it the volume, but we need to claim it.
+
+#### Creating a Persistent Volume Claim
+
+the volume is defined in the cluster, but in order to use we need to add a claim, which is another deployment file, and the type is **PersistentVolumeClaim**.
+
+
+we usually claim volumes by name, but there are additional ways to do so.
+
+**host-pvc.yaml**
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+    name: story-host-pvc
+spec:
+    volumeName: story-host-pv
+    accessModes:
+        - ReadWriteOnce
+    resources:
+        requests:
+            storage: 1Gi
+```
+
+now we need to connect our pods to the claim
+```yaml
+            volumes:
+                - name: story-volume
+                  emptyDir: {}
+                - name: story-host-path-volume
+                  hostPath:
+                    path: /data #path on the host machine
+                    type: DirectoryOrCreate
+                - name: story-host-pv-volume
+                  persistentVolumeClaim:
+                    claimName: story-host-pvc
+```
+
+
+matching fields: | Persistent Volume | Persistent Volume Claim
+------------|------------|--------
+name   | metadata:name| spec:volumeName:
+access modes | spec:accessModes|spec:accessModes
+storage | spec:capacity:storage: | spec:resources:requests:storage
+
+#### Using a Claim in a Pod
+
+before using, we need to define the storage class, which is part of the cluster, and we need to use it, so we add the key `storageClassName: standard` to the persistentVolume and the persistentVolumeClaim resources.
+
+```sh
+kubectl get sc
+```
+
+now we can try this, we need to apply everything.
+```sh
+kubectl apply -f service.yaml -f host-pv.yaml -f host-pvc.yaml -f deployment.yaml
+kubectl get pv,pvc
+```
+
+we won't see a difference, because we already had everything on one single node. but if we had other resources, they could also get the data.
+
+we talked about state earlier, where we had data was meant to be stored and intermediate data. we usually store intermediate data in pod volumes, and the data that is important should go in the volumes and persistent volumes.
+
+#### Volumes vs Persistent Volumes
+
+comparing the two types of volumes. both allow us to persist data over the application, "normal" volumes are independent of containers, but are attached to the pod, so data might be lost if the pod is removed. they are part of the definition of the pods/containers. the problem is that pod specific volumes might be reparative in terms of definitions.
+
+persistent are defined once and used multiple times.
+
+#### Using Environment Variables
+
+now we also look at environment variables, as we had before, we might want to pass variables to the container.
+
+we first replace the folder name in the code, 
+```js
+//const filePath = path.join(__dirname, 'story', 'text.txt');
+const filePath = path.join(__dirname, process.env.STORY_FOLDER, 'text.txt');
+```
+
+
+and we add the "env" key in the container definitions
+```yaml
+        spec:
+            containers:
+                - name: story
+                  image: benjaminshinar/kub-data-demo:latest
+                  env:
+                    - name: STORY_FOLDER
+                      value: 'story'
+                  volumeMounts:
+                    - mountPath: /app/story #internal
+                      name: story-host-path-volume #what volume we use.
+```
+and of course, we push the updated image.
+```sh
+docker image build -t benjaminshinar/kub-data-demo:0.3 -t benjaminshinar/kub-data-demo .
+docker image push benjaminshinar/kub-data-demo
+docker image push benjaminshinar/kub-data-demo:0.3
+kubectl apply -f deployment.yaml
+```
+
+#### Environment Variables & ConfigMaps
+
+but we can also keep the environment variables somewhere else, and not define them again and again for each resource. we can have new configuration file
+
+**environment.yaml**
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: data-store-env
+data:
+    folder: 'story'
+    #key: value
+```
+
+and we can apply it
+```
+kubectl apply -f environment.yaml
+kubectl get configmap
+```
+
+and in the deployment configuration, we take the value from a resource
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: story-deployment
+spec:
+    replicas: 2
+    selector:
+        matchLabels:
+            app: story
+    template:
+        metadata:
+            labels:
+                app: story
+        spec:
+            containers:
+                - name: story
+                  image: benjaminshinar/kub-data-demo:latest
+                  env:
+                     - name: STORY_FOLDER
+                  #     value: 'story'
+                        valueFrom:
+                            configMapKeyRef: 
+                                name: data-store-env
+                                key: folder #the key in the config map
+```
+
+and apply the deployment....
+
+#### Module Summary
+
+we learned about data, volumes and persistent data, we also looked at many more resources and how to define them.
 </details>

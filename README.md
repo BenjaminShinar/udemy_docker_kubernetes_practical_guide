@@ -199,5 +199,10 @@ shell commands
 
 ```sh
 $env:path
+
+# curl get
+curl --location --request GET 'localhost/story'
+# curl alternative
+Invoke-RestMethod 'localhost/story' -Method 'GET' -Headers $headers | ConvertTo-Json 
 ```
 </details>

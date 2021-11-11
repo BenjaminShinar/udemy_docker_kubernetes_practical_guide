@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: story-deployment
+spec:
+    replicas: 2
+    selector:
+        matchLabels:
+            app: story
+    template:
+        metadata:
+            labels:
+                app: story
+        spec:
+            containers:
+                - name: story
+                  image: benjaminshinar/kub-data-demo:latest
+                  env:
+                    - name: STORY_FOLDER
+                      valueFrom:
+                        configMapKeyRef:
+                          name: data-store-env
+                          key: folder
+                  volumeMounts:
+                    - mountPath: /app/story #internal
+                      name: story-host-pv-volume #what volume we use.
+            volumes:
+                - name: story-volume
+                  emptyDir: {}
+                - name: story-host-path-volume
+                  hostPath:
+                    path: /data #path on the host machine
+                    type: DirectoryOrCreate
+                - name: story-host-pv-volume
+                  persistentVolumeClaim:
+                    claimName: story-host-pvc
