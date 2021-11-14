@@ -37,7 +37,8 @@ based on the udemy course [Docker & Kubernetes: The Practical Guide](https://www
 
 - Kubernetes Concepts
 - Kubernetes in Action - Diving into the Core Concepts
-- 
+- Persistent Data in Kubernetes
+- Networking in Kubernetes
 
 
 
@@ -138,9 +139,15 @@ docker-compose.yaml file
 
 commands
 - up
+  - *--detach,-d*
+  - *--build*
+  - *--no-build*
+  - *--no-start*
 - down
 - run \<service name> \<arguments>
 - exec
+- ps
+- top
 </details>
 
 
@@ -175,6 +182,18 @@ kubectl commands
   - *--filename, -f* - which file to use
 
 *--selector, -l* - select with key:value, we can limit to kind.
+
+Resource (kind) | APIVersion | usage | spec fields|selector match | values?
+-------|-----------|----|-----|------|---
+Deployment | apps/v1 | define pods |selector,replicas, template | \[same-file]template:metadata |...
+Service | v1 |  stable IP and connection to the outside| selector,type,ports | deployment:template |type: "ClusterIP\NodePort\LoadBalancer"
+ConfigMap | v1 | environment variables |... |... |...
+PersistentVolume | v1 | ... |... |... |...
+PersistentVolumeClaim | v1 | ...|...|... | ...
+
+</details>
+
+
 ## Minikube
 
 <details>

@@ -925,3 +925,625 @@ and apply the deployment....
 
 we learned about data, volumes and persistent data, we also looked at many more resources and how to define them.
 </details>
+
+
+### Kubernetes Networking
+
+<details>
+<summary>
+Networking and communication between pods
+</summary>
+
+containers in kubernetes should be able to communicate with one another and with the outer world. this will be done by using services, we will also examine pod-internal communication and pod-to-pod 
+
+#### Starting Project & Our Goal
+we have another application for this lesson, located at folder "kub-network". a 'to-do tasks' application with three parts: authentication API, Users API and Tasks API.
+
+the auth api and the user api will be inside the same pod (for now), and the tasks API will be in a different pod. both pods will be reachable from the outside world. but the auth container won't accessible.
+
+we can start playing with it locally.
+
+```sh
+docker compose up -d
+```
+
+and then use postman, first to the log-in, then we can post and get task, we just need to make sure to have the 'tasks' folder created either, in code or in the docker file or docker-compose.
+
+#### Creating a First Deployment
+
+moving everything to the cloud.
+
+we first used the users.app, and we need to change some stuff to make this work without any other services
+
+```js
+    //const hashedPW = await axios.get('http://auth/hashed-password/' + password);
+    const hashedPW = 'dummy text'
+///
+//  const response = await axios.get(    'http://auth/token/' + hashedPassword + '/' + password  );
+const response = { status:200,data:{token:'abc'}};
+```
+
+now we need to build  a repository on dockerhub and push the image.
+```sh
+docker-compose build
+docker login  
+docker image tag kub-network_users benjaminshinar/kub-network_users
+docker image tag kub-network_users benjaminshinar/kub-network_users:0.1
+docker image push benjaminshinar/kub-network_users
+docker image push benjaminshinar/kub-network_users:0.1
+```
+
+and the next thing will be to create a deployment file
+
+**users-deployment.yaml:**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: users-deployment
+spec: 
+    replicas: 1
+    selector:
+        matchLabels:
+            app: users 
+    template:
+        metadata:
+            labels:
+                app: users
+        spec:
+            containers:
+            - name: users
+              image: benjaminshinar/kub-network_users:0.1
+```
+and we will now apply this
+
+```sh
+kubectl apply -f kubernetes/users-deployment.yaml
+```
+
+we will now be able to see this in the dashboard.
+
+#### Another Look at Services
+
+now we want a service, because we want to able to reach the users api from the outside world.
+services give us a stable address, that doesn't change if the pos is removed or changed. and the service also gives us someway to interact with the pods from the outside world.
+
+we need to define the type as either ClusterIP, NodePort or LoadBalancer.
+
+- ClusterIP gives inner communication and some internal balancing,
+- NodePort gives a stable IP address
+- LoadBalancer uses a load balancer for outside communications
+
+**users-service.yaml:**
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+    name: users-service
+spec:
+    selector:
+        app: users
+    type: LoadBalancer
+    ports:
+        - protocol: TCP
+          port: 8080
+          targetPort: 8080
+```
+
+we now apply the service, and give us access from minikube
+```sh
+kubectl apply -f kubernetes/users-service.yaml   
+minikube service users-service
+```
+
+and now we use postman to try to login and sign-up.
+
+now we can say that our application was started from minikube.
+
+now we want a pod internal communication.
+
+#### Multiple Containers in One Pod
+
+now we we need to edit the code back in the users-app.js file to use the original behavior. we also want to use environment variables
+
+```js
+    //const hashedPW = await axios.get('http://auth/hashed-password/' + password);
+    const hashedPW = 'dummy text'
+    const hashedPW = await axios.get(`http://${process.env.AUTH_ADDRESS}/hashed-password/` + password);
+///
+//  const response = await axios.get('http://auth/token/' + hashedPassword + '/' + password  );
+//const response = { status:200,data:{token:'abc'}};
+    const response = await axios.get(`http://${process.env.AUTH_ADDRESS}/token/` + hashedPassword + '/' + password  );
+```
+
+we update the docker compose file to allow local usage,
+
+**docker-Compose.yaml:**
+```yaml
+version: "3"
+services:
+  auth:
+    build: ./auth-api
+  users:
+    build: ./users-api
+    ports: 
+      - "8080:8080"
+    environment:
+      AUTH_ADDRESS: auth
+  tasks:
+    build: ./tasks-api
+    ports: 
+      - "8000:8000"
+    environment:
+      TASKS_FOLDER: tasks
+    volumes:
+      - /app/tasks
+```
+
+and for kubernetes usage, we will need something else.
+
+but we first need to build the auth image an push it
+```sh
+docker-compose build
+docker image tag kub-network_auth benjaminshinar/kub-network_auth
+docker image tag kub-network_auth benjaminshinar/kub-network_auth:0.1
+
+docker image tag kub-network_users benjaminshinar/kub-network_users:0.2
+docker image push benjaminshinar/kub-network_auth
+docker image push benjaminshinar/kub-network_auth:0.1
+docker image push benjaminshinar/kub-network_users:0.2
+```
+
+and now we need to use it, and for now we want to create it in the same deployment as our users app
+
+**users-deployment.yaml:**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: users-deployment
+spec: 
+    replicas: 1
+    selector:
+        matchLabels:
+            app: users 
+    template:
+        metadata:
+            labels:
+                app: users
+        spec:
+            containers:
+            - name: users
+              image: benjaminshinar/kub-network_users:0.2
+            - name: auth
+              image: benjaminshinar/kub-network_auth:0.1
+```
+we don't expose the port (80) to the outside world in the services file.
+
+#### Pod-internal Communication
+
+when containers are running on the same pod, we can use "localhost" to communicate between containers, so we need to provide the environment variables:
+
+**users-deployment.yaml:**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: users-deployment
+spec: 
+    replicas: 1
+    selector:
+        matchLabels:
+            app: users 
+    template:
+        metadata:
+            labels:
+                app: users
+        spec:
+            containers:
+            - name: users
+              image: benjaminshinar/kub-network_users:0.2
+              env:
+              - name: AUTH_ADDRESS
+                value: localhost
+            - name: auth
+              image: benjaminshinar/kub-network_auth:0.1
+```
+
+this should work properly, the docker-compose files passes the service name, while the deployment yaml passes the 'localhost'. we can use postman to send "signUp" and "login" requests.
+
+#### Creating Multiple Deployments
+
+the next thing we want is the task API, and we would want to ensure that the task api can talk to the authentication api, so we should now separated the authentication api to a third pod, and we need service that is reachable from the pods, but not from the outside world.
+
+we need a new deployment for the auth api, which separates them into different pods.
+
+**auth-deployment.yaml:**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: auth-deployment
+spec: 
+    replicas: 1
+    selector:
+        matchLabels:
+            app: auth 
+    template:
+        metadata:
+            labels:
+                app: auth
+        spec:
+            containers:
+            - name: auth
+              image: benjaminshinar/kub-network_auth:0.1
+```
+
+we also need a new service, we don't need an exposed port, so we use ClusterIP
+
+**auth-service.yaml:**
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+    name: auth-service
+spec:
+    selector:
+        app: auth
+    type: ClusterIP
+    ports:
+        - protocol: TCP
+          port: 80
+          targetPort: 80
+```
+
+and we change the value of the environment variables from 'localhost' to something else.
+
+#### Pod-to-Pod Communication with IP Addresses & Environment Variables
+
+we can get the ip of the service and use it as an environment variable:
+```sh
+kubectl get service
+```
+but this is a manual process, and there is more connivent way. kubernetes actually generates those for us. the format is the service name (all caps), then the `SERVICE_HOST` to get the ip.
+
+
+```js
+    //const hashedPW = await axios.get('http://auth/hashed-password/' + password);
+    //const hashedPW = 'dummy text'
+    //const hashedPW = await axios.get(`http://${process.env.AUTH_ADDRESS}/hashed-password/` + password);
+    const hashedPW = await axios.get(`http://${process.env.AUTH_SERVICE_SERVICE_HOST}/hashed-password/` + password);
+///
+//  const response = await axios.get('http://auth/token/' + hashedPassword + '/' + password  );
+//const response = { status:200,data:{token:'abc'}};
+    // const response = await axios.get(`http://${process.env.AUTH_ADDRESS}/token/` + hashedPassword + '/' + password  );
+    const response = await axios.get(`http://${process.env.AUTH_SERVICE_SERVICE_HOST}/token/` + hashedPassword + '/' + password  );
+```
+
+this hurts us when we want to use docker-compose, we would have to add the exact name to file.
+
+```sh
+docker-compose build 
+docker image tag kub-network_users benjaminshinar/kub-network_users:
+docker image tag kub-network_users benjaminshinar/kub-network_users:0.3
+docker image push benjaminshinar/kub-network_users
+docker image push benjaminshinar/kub-network_users:0.3
+
+kubectl apply -f kubernetes/users-deployment.yaml -f kubernetes/users-service.yaml -f kubernetes/auth-deployment.yaml -f kubernetes/auth-service.yaml
+```
+
+#### Using DNS for Pod-to-Pod Communication
+
+the automatically generated environment variables are useful, but there is even something better, CoreDNS. it also uses the service name, just like what we had with docker-compose.
+
+```js
+    //const hashedPW = await axios.get('http://auth/hashed-password/' + password);
+    //const hashedPW = 'dummy text'
+    //const hashedPW = await axios.get(`http://${process.env.AUTH_ADDRESS}/hashed-password/` + password);
+//    const hashedPW = await axios.get(`http://${process.env.AUTH_SERVICE_SERVICE_HOST}/hashed-password/` + password);
+    const hashedPW = await axios.get(`http://${process.env.AUTH_ADDRESS}/hashed-password/` + password);
+///
+//  const response = await axios.get('http://auth/token/' + hashedPassword + '/' + password  );
+//const response = { status:200,data:{token:'abc'}};
+    // const response = await axios.get(`http://${process.env.AUTH_ADDRESS}/token/` + hashedPassword + '/' + password  );
+    //const response = await axios.get(`http://${process.env.AUTH_SERVICE_SERVICE_HOST}/token/` + hashedPassword + '/' + password  );
+    const response = await axios.get(`http://${process.env.AUTH_ADDRESS}/token/` + hashedPassword + '/' + password  );
+```
+the exact format is "\<service name>" + "." + "\<namespace>"
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: users-deployment
+spec: 
+    replicas: 1
+    selector:
+        matchLabels:
+            app: users 
+    template:
+        metadata:
+            labels:
+                app: users
+        spec:
+            containers:
+            - name: users
+              image: benjaminshinar/kub-network_users:0.4
+              env:
+              - name: AUTH_ADDRESS
+                value: "auth-service.default"
+```
+
+#### Which Approach Is Best? And a Challenge!
+
+this of course depends on whether the containers belong in the same pods or not.
+
+if they are, then we can use 'localhost'.
+
+if not, we must have a service, and we can either use the environment variables auto-generated or the CoreDNS name.
+
+now we should create the task app, which should run on it's own pod, connect to the auth API and receive outside requests.
+
+**tasks-deployment.yaml:**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: tasks-deployment
+spec: 
+    replicas: 1
+    selector:
+        matchLabels:
+            app: tasks 
+    template:
+        metadata:
+            labels:
+                app: tasks
+        spec:
+            containers:
+            - name: tasks
+              image: benjaminshinar/kub-network_tasks:0.1
+              env:
+              - name: AUTH_ADDRESS
+                value: "auth-service.default"
+              - name: TASKS_FOLDER
+                value: tasks
+            
+```
+
+**tasks-service.yaml:**
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+    name: tasks-service
+spec:
+    selector:
+        app: tasks
+    type: LoadBalancer
+    ports:
+        - protocol: TCP
+          port: 8000
+          targetPort: 8000
+```
+
+build and push the image, then apply and check with postman
+```sh
+docker compose build
+docker image tag kub-network_tasks benjaminshinar/kub-network_tasks
+docker image tag kub-network_tasks benjaminshinar/kub-network_tasks:0.1
+docker image push benjaminshinar/kub-network_tasks
+docker image push benjaminshinar/kub-network_tasks:0.1
+
+kubectl apply -f kubernetes/users-deployment.yaml -f kubernetes/users-service.yaml -f kubernetes/auth-deployment.yaml -f kubernetes/auth-service.yaml -f kubernetes/tasks-deployment.yaml -f kubernetes/tasks-service.yaml
+
+minikube service tasks-service
+```
+
+we need to provide the authorization header key,
+
+#### Challenge Solution
+
+we need to change the `GET` request that talks to the authentication api, we use an environment variable, we add it to the docker-compost file.
+
+we then create a 'tasks-deployment.yaml' and 'tasks-service.yaml' file, we need port 8000 and to use 'LoadBalancer' as the type.
+
+
+#### Adding a Containerized Frontend
+
+next we want to add a frontend, inside the "frontend" folder. it is built in react. this will allow us to test directly without using postman.
+
+we have function that use 'fetch to grab stuff. we have a multistage build setup, because react app require a build.
+
+we can change the url to what we used in postman, add to docker-compose, build the image and try it locally.
+
+**docker-compose.yaml:**
+```yaml
+version: "3"
+services:
+  auth:
+    build: ./auth-api
+  users:
+    build: ./users-api
+    ports: 
+      - "8080:8080"
+    environment:
+      AUTH_ADDRESS: auth
+  tasks:
+    build: ./tasks-api
+    ports: 
+      - "8000:8000"
+    environment:
+      TASKS_FOLDER: tasks
+      AUTH_ADDRESS: auth
+    volumes:
+      - /app/tasks
+  frontend:
+    build: ./frontend
+    ports:
+        - "80:80"
+```
+
+we now have a CORS (cross origin resource sharing) violation. we need to somehow fix this. we need to update the tasks-api code and add a some headers.
+
+```js
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  next();
+})
+```
+so now we have to rebuild the image and push it...
+
+```sh
+docker compose build
+docker image tag kub-network_tasks benjaminshinar/kub-network_tasks
+docker image tag kub-network_tasks benjaminshinar/kub-network_tasks:0.2
+docker image push benjaminshinar/kub-network_tasks
+docker image push benjaminshinar/kub-network_tasks:0.2
+
+kubectl apply -f kubernetes/users-deployment.yaml -f kubernetes/users-service.yaml -f kubernetes/auth-deployment.yaml -f kubernetes/auth-service.yaml -f kubernetes/tasks-deployment.yaml -f kubernetes/tasks-service.yaml
+```
+
+now we should see things crushing because of authorization issues. we add the options object to the fetch request with the 'authorization' header.
+
+```js
+  const fetchTasks = useCallback(function () {
+    fetch(str, {
+      headers: {
+        'Authorization': 'Bearer abc'
+      }
+    })
+```
+
+(this didn't work for me)
+
+but what if we want to host the code on the cloud?
+
+#### Deploying the Frontend with Kubernetes
+
+we want our react application to run on the cloud
+we want a new pod, so that means a new deployment file
+
+**frontend-deployment.yaml:**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: frontend-deployment
+spec: 
+    replicas: 1
+    selector:
+        matchLabels:
+            app: frontend 
+    template:
+        metadata:
+            labels:
+                app: frontend
+        spec:
+            containers:
+            - name: frontend
+              image: benjaminshinar/kub-network_frontend:0.1
+```
+and a service file
+
+**frontend-service.yaml:**
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+    name: frontend-service
+spec:
+    selector:
+        app: frontend
+    type: LoadBalancer
+    ports:
+        - protocol: TCP
+          port: 80
+          targetPort: 80
+```
+
+we build and push the image before using it.
+
+```sh
+docker compose build
+docker image tag kub-network_frontend benjaminshinar/kub-network_frontend
+docker image tag kub-network_frontend benjaminshinar/kub-network_frontend:0.1
+docker image push benjaminshinar/kub-network_frontend
+docker image push benjaminshinar/kub-network_frontend:0.1
+
+kubectl apply -f kubernetes/users-deployment.yaml -f kubernetes/users-service.yaml -f kubernetes/auth-deployment.yaml -f kubernetes/auth-service.yaml -f kubernetes/tasks-deployment.yaml -f kubernetes/tasks-service.yaml -f kubernetes/frontend-deployment.yaml -f kubernetes/frontend-service.yaml
+
+minikube service frontend-service
+```
+
+
+we don't want to hard code the address, even though it usually works.
+
+#### Using a Reverse Proxy for the Frontend
+
+we can avoid hard-coding with a 'reverse proxy'. we want to send the request to the same service that services the application, which is ourselves. we do this by fixing the the nginx.conf file. we set a rule that controls what happens to requests that target a certain access point
+
+```
+server {
+  listen 80;
+  
+  # this is new
+  location /api {
+      proxy_pass http://127.0.0.1:63764;
+  }
+
+  location / {
+    root /usr/share/nginx/html;
+    index index.html index.htm;
+    try_files $uri $uri/ /index.html =404;
+  }
+  
+  include /etc/nginx/extra-conf.d/*.conf;
+}
+```
+
+and we change the fetch code again...
+
+```js
+  const fetchTasks = useCallback(function () {
+    fetch('/api/tasks', {
+      headers: {
+          ///....
+```
+remove the old deployment
+
+```sh
+kubectl delete -f kubernetes/frontend-deployment.yaml
+```
+
+still not working, because the configuration runs on the server, not on the computer running the browser. so we use the core DNS stuff to use the domain name.
+
+don't forget the trailing slashes and the port
+```
+server {
+  listen 80;
+  
+  # this is new
+  location /api/ {
+      proxy_pass http://tasks-service.default:8000/;
+  }
+
+  location / {
+    root /usr/share/nginx/html;
+    index index.html index.htm;
+    try_files $uri $uri/ /index.html =404;
+  }
+  
+  include /etc/nginx/extra-conf.d/*.conf;
+}
+```
+
+now things should work.
+
+#### Module Summary
+
+we looked at containers and pods communicating, between pods in the same containers, between the outside world and the pods, and between containers in different pods. we practiced yaml files and discovered some automatically generated configurations to get the services.
+
+</details>
