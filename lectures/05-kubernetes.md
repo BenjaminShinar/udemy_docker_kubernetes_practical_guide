@@ -1822,7 +1822,7 @@ spec:
           image: benjaminshinar/kub-challenge-tasks:latest
           env:
             - name: MONGODB_CONNECTION_URI
-              value: 'mongodb+srv://maximilian:wk4nFupsbntPbB3l@cluster0.ntrwp.mongodb.net/users?retryWrites=true&w=majority'
+              value: 'mongodb+srv://maximilian-doublecolons-wk4nFupsbntPbB3l@cluster0.ntrwp.mongodb.net/users?retryWrites=true&w=majority'
             - name: AUTH_API_ADDRESS
               value: 'auth-service.default:3000'
 ```
