@@ -1590,7 +1590,7 @@ as usual, we need a project to work with, under the folder "kub-deploy". it has 
 we need to adjust some stuff if we want to follow along, like a mongodb atlas url. we need to create one of our own and then update the connection string in the docker-compose and the deployment configuration files.
 
 ```yaml
-      MONGODB_CONNECTION_URI: 'mongodb+srv://maximilian:wk4nFupsbntPbB3l@cluster0.ntrwp.mongodb.net/users?retryWrites=true&w=majority'
+      MONGODB_CONNECTION_URI: 'mongodb+srv://maximilian-doublecolons-wk4nFupsbntPbB3l@cluster0.ntrwp.mongodb.net/users?retryWrites=true&w=majority'
 ```
 
 we also need to change the images in the kubernetes deployment and push them to our personal registry.
