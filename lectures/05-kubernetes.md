@@ -1,12 +1,12 @@
 <!--
 ignore these words in spell check for this file
-// cSpell:ignore Kubermatic systeminfo USERPROFILE mkdir hyperv rootkey  configmap benjaminshinar
+// cSpell:ignore Kubermatic systeminfo USERPROFILE mkdir hyperv rootkey  configmap benjaminshinar Kops kubeconfig sigs
 -->
 
 [Menu](../README.md)
 
 ## Kubernetes
-(includes sections 11,12,13)
+(includes sections 11,12,13,14,15,16)
 
 ### Getting Started With Kubernetes
 
@@ -1545,5 +1545,322 @@ now things should work.
 #### Module Summary
 
 we looked at containers and pods communicating, between pods in the same containers, between the outside world and the pods, and between containers in different pods. we practiced yaml files and discovered some automatically generated configurations to get the services.
+
+</details>
+
+### Kubernetes - Deployment (AWS EKS)
+
+<details>
+<summary>
+Running Kubernetes on AWS EKS.
+</summary>
+
+in this section we will deploy kubernetes to a real remote machine, which means AWS. not just with minikube.
+
+#### Deployment Options & Steps
+
+> What kubernetes will do:
+> - Create your objects (e.g. Pods) and manage them
+> - Monitor Pods and re-create them, scale Pods, etc
+> - Kubernetes utilizes the provided (cloud) resources to apply your configuration/goals
+>  
+> What you need to do/setup (i.e. what kubernetes requires)
+> - Create the cluster and the node instances
+> - Setup API Server, kubelet and other kubernetes services/software on nodes.
+> - Create other (cloud) provider services that might be needed (e.g. Load Balancer, FileSystems)
+
+minikube is a dummy cluster that we can use locally. but now we want to play with a real thing. we must choose between using a custom data center and using a cloud provider.
+
+custom data center requires us to install and configure everything on our own, that includes the kubernetes software.
+
+if we go with a cloud provider, we can use low-level resources to create a cluster, that means we get remote machines, but we are responsible to install and setup everything kubernetes, this can be done manually or with a tool such as Kops.\
+we can also use a managed service, where the cloud provider sets everything for us, and we can start right away.
+
+#### AWS EKS vs AWS ECS
+
+> AWS ECS: elastic **Containers** Service. managed service for container deployment,Aws-specific syntax and philosophy applies. use AWS-specific configuration and concepts.
+> 
+> AWS EKS: elastic **Kubernetes** Service. managed service for kubernetes deployment. No AWS-specific syntax or philosophy required, use standard kubernetes configuration and resources.
+
+
+#### Preparing the Starting Project
+
+as usual, we need a project to work with, under the folder "kub-deploy". it has two parts, auth-api and users-api, as well as docker-compose and kubernetes configuration files (each with a service and deployment).
+
+we need to adjust some stuff if we want to follow along, like a mongodb atlas url. we need to create one of our own and then update the connection string in the docker-compose and the deployment configuration files.
+
+```yaml
+      MONGODB_CONNECTION_URI: 'mongodb+srv://maximilian:wk4nFupsbntPbB3l@cluster0.ntrwp.mongodb.net/users?retryWrites=true&w=majority'
+```
+
+we also need to change the images in the kubernetes deployment and push them to our personal registry.
+
+```sh
+docker-compose build .
+docker login
+docker image tag kub-deploy_users benjaminshinar/kub-deploy_users:0.1
+docker image tag kub-deploy_auth benjaminshinar/kub-deploy_auth:0.1
+docker image push benjaminshinar/kub-deploy_users:0.1
+docker image push benjaminshinar/kub-deploy_auth:0.1
+```
+
+we can also play with it locally on minikube.
+
+#### Diving Into AWS
+
+AWS is used only as an example. other cloud providers also have kubernetes support, such as AKS (Azure Kubernetes service) from microsoft. we
+
+#### Creating & Configuring the Kubernetes Cluster with EKS
+
+we start by adding a cluster, we give it a name, decide on the kubernetes version, and the cluster service role. this controls permissions, and uses a different AWS service, called IAM (Identity and Access Management). we might create a role for eks.\
+we now specify the network, we need to provide access from the outside world, we can search for **cloud formation** and then <kbd>create stack</kbd>, we gran the link from this [page](https://docs.aws.amazon.com/eks/latest/userguide/create-public-private-vpc.html#create-vpc) as a template for our network. we simple give the stack a name (no need for anything else). with the stack created, we use it as the VPC in out networking page. for <kbd>cluster endpoint access</kbd>, we choose *public and private*.\
+there isn't much to do for now in the logging tab, so we leave them as they were,and we create the cluster.
+
+we take a small break while the cluster is being created.
+
+#### Configuring Kubectl To talk with AWS
+we currently have kubectl configured on the minikube, when we write `kubectl`, it's actually being directed at minikube. so we need to go the user files, the hidden folder "*.kube*", the file *config*.
+
+```sh
+cd ~
+ls 
+cd .kube
+# use any editor available
+code config
+```
+
+if we have minikube running, the file will have all sorts of data. which will be gone once we 'minikube delete`
+
+we need to override this file to direct kubectl commands to the AWS, we first create a backup the of the file, and then use the [AWS CLI](https://aws.amazon.com/cli/) tool to configure the command line to work with AWS. once installed, we need to enable the use of it from aws.
+><kbd>Account</kbd> - > "<kbd>My Security / Credentials</kbd> - > <kbd>Access Keys</kbd> - > <kbd>Create New Access Key</kbd> (download).
+
+now that we have the file, we run `aws configure` and use the key and secret key values from the file. we provide a region name.
+
+once the cluster is active we can enter the command to update the configuration file and make it talk with aws.
+
+```sh
+aws eks --region <region> update-kubeconfig --name <cluster name>
+```
+#### Adding Worker Nodes
+
+now we need to add the nodes. on the cluster, we go to <kbd>Compute</kbd> tab, and then click on <kbd>Add Node Group</kbd>, we give the node group a name, and choose a <kbd>node IAM role</kbd>. we open the IAM console and create a new role, we need the following permissions:
+- AmazonEKSWorkerNodePolicy
+- AmazonEKS_CNI_Policy
+- AmazonEC2ContainerRegistryReadOnly
+
+with this role created, we can use it for the node group.
+under the <kbd>Set compute and scaling configuration</kbd> and we choose *t3.small* as <kbd>instance type</kbd>, we can also specify the scaling configuration. this is scaling in terms of nodes, not pods. in minikube we had only one node, but cloud providers can give us more than a single work node.
+
+we finish up with the networks and start running the pods, EKS will not only launch the nodes, it will also install the required kubernetes software and add them to the same network.
+
+we can look at our instances from EC2 dashboard, we currently don't have any load balancers.
+
+#### Applying Our Kubernetes Config
+
+now we can start. our cluster is up, the `kubectl` command is configured to work against AWS.
+
+```sh
+cd kubernetes
+kubectl apply -f auth.yaml -f users.yaml
+kubectl get deployments
+kubectl get services
+```
+when we look at the services, the External-IP column is not pending like it was with minikube, it's showing a real address, we don't need `minikube service` to get a functioning ip address. we can use this for postman like before. we sign up, then login, and we get actual responses.
+
+we now can see a load balancer on the instances page, which was created by kubernetes.
+
+we can now change the deployment files (increase replicas) and apply the file again and see how the pods are being created.
+
+#### Getting Started with Volumes
+
+the application is running, we already covered volumes when we used minikube, we looked at *emptyDir* and *hostPath*, but also mentioned *csi* without diving into it. now we finally get to use it.
+
+the code currently doesn't write files, but if it was, we would have needed volumes to make the data persistent.
+
+in the local world, we would add a volume into the docker-compose file. in kubernetes we can add a volume for each container, or use a persistent volume and persistent volume claims.
+
+emptyDir creates a new directory for each pod, hostPath creates a path on the node, so we could share the same volume for pods on the same node, it the data outlived the pods lifecycle. however, this won't work for multi-node setup, we want all the pods to share data, regardless of which node they use.
+
+the csi (container storage interface) is a standard interface the can connect to other services to give us volumes. we will use at AWS EFS (elastic file system)
+
+#### Adding EFS as a Volume (with the CSI Volume Type)
+
+our first task is to install the driver to the cluster, we look at the [github page](https://github.com/kubernetes-sigs/aws-efs-csi-driver) and find the command to install the plugin.
+
+```sh
+kubectl apply -k "github.com/kubernetes-sigs/aws-efs-csi-driver/deploy/kubernetes/overlays/stable/?ref=release-1.3"
+```
+
+next we need to create the volume storage, so we open EFS browser.
+we also need an EC2 and to create a security group, we care about the vpc and the <kbd>inbound rules</kbd> *NFS* and a custom ip. back to efs
+<kbd>Create file system</kbd>, choose the correct VPC, <kbd>customize</kbd>, the <kbd>network access</kbd> tab, replace the security groups with the one we created. we finish the creation and we have a file system to use as the volume.
+
+#### Creating a Persistent Volume for EFS
+
+we add a section in "users.yaml" to create a persistent volume. we should also create folder under users to ensure there is where to write the files.
+we also need a storage class resource, which goes above the persistent volume resource. we copy it from the documentation.
+
+```yaml
+---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+    name: efs-sc
+provisioner: efs.csi.aws.com
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata: 
+    name: efs-pv
+spec:
+    capacity:
+        storage: 5Gi
+    volumeMode: Filesystem
+    accessModes:
+        - ReadWriteMany
+    storageClassName: efs-sc
+    csi:
+        driver: efs.csi.aws.com
+        volumeHandle: <file system id>
+```
+in aws efs, the capacity key doesn't matter actually, so we can write whatever. 
+
+we also need to use the volume, so we fix open the **users.yaml** and add to the spec section a new key (under containers, same level). as well as a persistent volume claim.
+```yaml
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+    name: efs-pvc
+spec:
+    accessModes:
+        - ReadWriteMany
+    storageClassName: efs-sc
+    resources:
+        requests:
+            storage: 5Gi
+
+```
+we need to use this claim, and add volume Mounts to tell the containers where to store the files
+```yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: users-deployment
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app: users
+template:
+    metadata:
+        labels:
+            app: users
+    spec:
+        containers:
+            - name: users-api
+              image: benjaminshinar/kub-deploy_users:0.1
+              env:
+                - name: MONGODB_CONNECTION_URI
+                  value: 'mongodb+srv://maximilian:wk4nFupsbntPbB3l@cluster0.ntrwp.mongodb.net/users?retryWrites=true&w=majority'
+                - name: AUTH_API_ADDRESS
+                  value: 'auth-service.default:3000'
+              volumeMounts:
+                - name: efs-vol
+                  mountPath: /app/users
+        volumes:
+            - name: efs-vol
+              persistentVolumeClaim:
+              claimName: efs-pvc
+```
+
+#### Using the EFS Volume
+
+with everything setup, we need to change the code in user-actions.js and user-routes.js to read and write files. we rebuild the image, and push it, and we can also use our new deployment.
+
+we test this with postman, we create a user and login, and then get the logs from the "/logs" route. we can also look at the aws-efs dashboard and see the data being transferred and the client connection number. we can change the number of replicas to zero to destroy all pods, and then see that the data outlives the pods if we set the replicas back to 1.
+
+we could use any volume type, the csi provides a standard interface for us to use
+
+#### A Challenge!
+
+now we practice with a new application, "kub-challenge", which we should create on our own and push to the cloud. it has a tasks application as well, so we need to set up a deployment. make sure it connects to the auth service and the database and that it has connection to the outside world.
+
+tasks.yaml
+```yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tasks-service
+spec:
+  selector:
+    app: tasks
+  type: LoadBalancer
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tasks-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tasks
+  template:
+    metadata:
+      labels:
+        app: tasks
+    spec:
+      containers:
+        - name: tasks-api
+          image: benjaminshinar/kub-challenge-tasks:latest
+          env:
+            - name: MONGODB_CONNECTION_URI
+              value: 'mongodb+srv://maximilian:wk4nFupsbntPbB3l@cluster0.ntrwp.mongodb.net/users?retryWrites=true&w=majority'
+            - name: AUTH_API_ADDRESS
+              value: 'auth-service.default:3000'
+```
+
+(I can't do the aws parts)
+
+#### Challenge Solution
+
+we create the yaml file to hold the service and the deployment. we build it similar to the "users.yaml". the ports are "80:3000". 
+we build and push the images (all of them are slightly different now) and apply our configurations.
+
+we use postman to try to get the tasks, it first fails because we don't have an authentication service, which we get if we send a login request to the users application, we add the token to the header, and try again, we can also add tasks. everything will be stored in the mongo db. each user has it's own tasks.
+we can also delete tasks, all via the capabilities we get from mongoDB.
+
+</details>
+
+### Round Up and Next Steps
+
+<details>
+<summary>
+Summary of what we learned and what's ahead
+</summary>
+
+> - You know what docker is and why use it
+> - Docker can used locally (development) and in production - you can do both or just one.
+> - Docker = Images + Containers
+> - Docker-compose helps with complex, multi-container projects, especially locally.
+> - Kubernetes helps with multi-machine container orchestration and deployment
+
+if we want to learn more, we can look into more topics, which we didn't go over.
+
+> - using applications from other programming languages. not just nodejs, python and php. we would have different images setup.
+> - CI-CD (continues integration, continues deployment). complex pipelines with external tools (jenkins, github, Travis).
+> - deeper dive into AWS, other services and more detailed learning of the tools we used.
+> - other cloud providers, google, amazon, etc...
+> - advanced cluster or docker administration. the side of using docker that is less used by developers.
+
+we can learn those topics and improve our skills:\
+first by using docker and practicing it (putting it into use in real projects). we can learn from the official documentations of docker, kubernetes or the cloud provider. we can also look at stuff like *vs Code Docker Support* and see how docker is used in different ways.
 
 </details>

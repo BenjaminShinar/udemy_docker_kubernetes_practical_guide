@@ -39,6 +39,8 @@ based on the udemy course [Docker & Kubernetes: The Practical Guide](https://www
 - Kubernetes in Action - Diving into the Core Concepts
 - Persistent Data in Kubernetes
 - Networking in Kubernetes
+- Kubernetes deployment (AWS EKS)
+- Round Up
 
 
 
@@ -187,9 +189,10 @@ Resource (kind) | APIVersion | usage | spec fields|selector match | values?
 -------|-----------|----|-----|------|---
 Deployment | apps/v1 | define pods |selector,replicas, template | \[same-file]template:metadata |...
 Service | v1 |  stable IP and connection to the outside| selector,type,ports | deployment:template |type: "ClusterIP\NodePort\LoadBalancer"
-ConfigMap | v1 | environment variables |... |... |...
-PersistentVolume | v1 | ... |... |... |...
-PersistentVolumeClaim | v1 | ...|...|... | ...
+ConfigMap | v1 | environment variables |data |none |key-value pairs
+PersistentVolume | v1 | define data storage on the cluster |capacity, volumeMode, storageClassName, accessModes, hostPath |none | volumeMode: "Filesystem, Block", 
+PersistentVolumeClaim | v1 | use storage |volumeName, StorageClassName, accessModes, Resources, |none|accessModes:  "ReadWriteOnce\ReadOnlyManyReadWriteMany"
+StorageClass | storage.k8s.io/v1| volume/storage plug-in | **no spec, but has provisioner**| none | none
 
 </details>
 
