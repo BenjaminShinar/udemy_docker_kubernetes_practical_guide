@@ -7,7 +7,7 @@
 ##
 
 # Logs Paths
-./multi-01-starting-setup\backend\logs
+./multi-app\backend\logs
 # vscode settings
 .vscode/*.*
 workspace.code-workspace

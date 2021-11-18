@@ -432,7 +432,7 @@ Persistent data storage is down with **Volumes**.
 
 #### Analyzing a Real App
 
-another nodeJs example for us to dockerize. the folder "data-volumes-01-starting-setup"
+another nodeJs example for us to dockerize. the folder "data-volumes"
 
 this time the form creates files and stores them, we would want these data to be persistent somehow across uses. we don't want to lose the feedback from the user when the website goes down.
 
@@ -459,7 +459,7 @@ CMD [ "node", "server.js" ]
 now we build and run the image. we can go into the container afterwards and see the files being created when we use the website. we can also visit the feedback folder from the browser going into (localhost:3000/feedback/filename.text), but this isn't available from the host machine directly.
 
 ```sh
-docker image build --tag feedback:0.0.1 .\data-volumes-01-starting-setup\ 
+docker image build --tag feedback:0.0.1 .\data-volumes-\ 
 docker container run --rm --detach --name feedback -p 3000:80 feedback:0.0.1
 docker container exec -it feedback bash
 ```
@@ -499,7 +499,7 @@ CMD [ "node", "server.js" ]
 now we build again and try this
 
 ```sh
-docker image build --tag feedback:0.0.2 .\data-volumes-01-starting-setup\ 
+docker image build --tag feedback:0.0.2 .\data-volumes\ 
 docker container run --rm --detach --name feedback -p 3000:80 feedback:0.0.2
 ```
 
@@ -565,7 +565,7 @@ volumes are managed by Docker, and we don't know where they are stored. bind mou
 bind mounts are specific to the container, so we need specify it with an absolute path and where it's mapped to.
 
 ```sh
-docker container run --rm --detach --name feedback -v D:/Docker_Kubernetes_The_Practical_Guide/data-volumes-01-starting-setup/feedback:/app/feedback -p 3000:80 feedback:0.0.3
+docker container run --rm --detach --name feedback -v D:/Docker_Kubernetes_The_Practical_Guide/data-volumes/feedback:/app/feedback -p 3000:80 feedback:0.0.3
 ```
 
 we should make sure that docker has access to the folder, (note visible in windows docker-desktop with wsl integration).
@@ -579,7 +579,7 @@ note: for windows we can write `-v "%cd%":/app` instead of the entire path.
 
 recall that this failed
 ```sh
-docker container run --detach --name feedback -v D:/Docker_Kubernetes_The_Practical_Guide/data-volumes-01-starting-setup:/app -p 3000:80 feedback:0.0.3
+docker container run --detach --name feedback -v D:/Docker_Kubernetes_The_Practical_Guide/data-volumes:/app -p 3000:80 feedback:0.0.3
 docker container ls -a
 docker container logs feedback
 ```
@@ -589,7 +589,7 @@ we can have both volumes and bind mounts for the same container.
 
 we need to tell docker not to overwrite the files inside it. we add another anonymous volume and direct it to the node modules folder.
 ```sh
-docker container run --detach --name feedback -v feedback:/app/feedback -v D:/Docker_Kubernetes_The_Practical_Guide/data-volumes-01-starting-setup:/app -v /app/node_modules -p 3000:80 feedback:0.0.3
+docker container run --detach --name feedback -v feedback:/app/feedback -v D:/Docker_Kubernetes_The_Practical_Guide/data-volumes:/app -v /app/node_modules -p 3000:80 feedback:0.0.3
 ```
 we can (any maybe should) have it in the dockerfile. if there is a conflict between volumes, the most specific one wins. so the anonymous volume wins over the bind mount and retains itself. we now can change the source code and still use the same image. this is easier for us in the development stages.
 
@@ -630,8 +630,8 @@ CMD [ "npm", "start" ]
 so we have to rebuild the image.
 
 ```sh
-docker image build --tag feedback:0.0.4 .\data-volumes-01-starting-setup\ 
-docker container run --detach --name feedback -v feedback:/app/feedback -v D:/Docker_Kubernetes_The_Practical_Guide/ \ data-volumes-01-starting-setup:/app -p 3000:80 feedback:0.0.4
+docker image build --tag feedback:0.0.4 .\data-volumes\ 
+docker container run --detach --name feedback -v feedback:/app/feedback -v D:/Docker_Kubernetes_The_Practical_Guide/ \ data-volumes:/app -p 3000:80 feedback:0.0.4
 ```
 
 for windows, because of wsl2, stuff doesn't work. there is an issue.
@@ -659,7 +659,7 @@ Overriding only happens if we write them in the command line, not in the dockerf
 
 
 ```sh
-docker container run --detach --rm --name feedback -p 3000:80  -v feedback:/app/feedback -v D:/Docker_Kubernetes_The_Practical_Guide/data-volumes-01-starting-setup:/app:ro -v /app/temp -v /app/node_modules -v feedback:0.0.4
+docker container run --detach --rm --name feedback -p 3000:80  -v feedback:/app/feedback -v D:/Docker_Kubernetes_The_Practical_Guide/data-volumes:/app:ro -v /app/temp -v /app/node_modules -v feedback:0.0.4
 ```
 
 #### Managing Docker Volumes

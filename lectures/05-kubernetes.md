@@ -516,10 +516,10 @@ we still want persistent data, so we need to bring volumes to the cloud.
 
 #### Starting Project & What We Know Already
 
-we have a example project in the "kub-data-01-starting-setup" folder. we have two entry point, `GET` and `POST` to "/story". the data should survive across deployments.
+we have a example project in the "kub-data" folder. we have two entry point, `GET` and `POST` to "/story". the data should survive across deployments.
 we can test this app locally with docker compose
 ```sh
-cd kub-data-01-starting-setup
+cd kub-data
 docker-compose up -d --build
 ```
 
@@ -543,7 +543,7 @@ curl --location --request GET 'localhost/story'
 if we want to remove the data, we need to remove the volume itself
 ```sh
 docker volume ls
-docker volume rm kub-data-01-starting-setup_stories
+docker volume rm kub-data_stories
 ```
 now we would want to use the same thing on remote deployment
 

@@ -61,11 +61,11 @@ we will get this example working in three steps:
 > 2. Configure security groupe to expose all required ports to WWW
 > 3. Connect to instance (SSH), install docker and run container.
 
-lets get the simple application in the folder "deployment-01-starting-setup". it's a really basic application that simply serves a static page. we can create a docker-compose file, but we won't do this right now.
+lets get the simple application in the folder "basic-deployment". it's a really basic application that simply serves a static page. we can create a docker-compose file, but we won't do this right now.
 
 
 ```sh
-cd deployment-01-starting-setup\
+cd basic-deployment\
 docker image build -t simplenodeapp .
 docker container run --rm -d -p 3000:80 --name simple simplenodeapp
 docker container stop simple

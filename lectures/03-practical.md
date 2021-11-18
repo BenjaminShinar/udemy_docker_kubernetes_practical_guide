@@ -24,7 +24,7 @@ our application has three components:
 2. Backend - nodeJS rest API.
 3. Front - react single page application.
 
-the code is in the "multi-01-starting-setup" folder.
+the code is in the "multi-app" folder.
 we can go over the code and try to understand it on our own, but this isn't required. 
 
 we want the dockerize-d database to persist, and for the logs folder to be persistent. we also want changes to the source code to be reflected live, both for the backend and the frontend.
@@ -223,7 +223,7 @@ cd multi-01-starting-app
 docker image build --tag goals-node backend/.
 
 #run container
-docker container run --name goals-backend --rm -d --network goals-network -v goals-logs:/app/logs --publish 80:80 -v "D:\Docker_Kubernetes_The_Practical_Guide\multi-01-starting-setup\backend:/app" -v /app/node_modules goals-node
+docker container run --name goals-backend --rm -d --network goals-network -v goals-logs:/app/logs --publish 80:80 -v "D:\Docker_Kubernetes_The_Practical_Guide\multi-app\backend:/app" -v /app/node_modules goals-node
 ```
 
 two last things, we have the user name for the mongodb hardcoded, we don't like this. let's change this to use environment variables as well
@@ -245,7 +245,7 @@ const password =process.env.MONGODB_PASSWORD;
 we build the image again, and now run the container with the *--env* flag.
 
 ```sh
-docker container run --name goals-backend --rm -d --network goals-network -v goals-logs:/app/logs --publish 80:80 -v "D:\Docker_Kubernetes_The_Practical_Guide\multi-01-starting-setup\backend:/app" -v /app/node_modules -e MONGODB_USERNAME=max --env MONGODB_PASSWORD=secret  goals-node
+docker container run --name goals-backend --rm -d --network goals-network -v goals-logs:/app/logs --publish 80:80 -v "D:\Docker_Kubernetes_The_Practical_Guide\multi-app\backend:/app" -v /app/node_modules -e MONGODB_USERNAME=max --env MONGODB_PASSWORD=secret  goals-node
 ```
 
 now lets add a *.dockerignore* file to ensure we aren't copying dependencies again and again.
@@ -263,7 +263,7 @@ we build the image again, and continue to work on the react frontend service.l
 in the react code, we also want to allow for live source updates. we need bind mounts as well. there is no need to use nodemon in react.
 
 ```sh
-docker container run -v "D:\Docker_Kubernetes_The_Practical_Guide\multi-01-starting-setup\frontend\src:/app/src" --name goals-frontend --rm -p 3000:3000 -it goals-react
+docker container run -v "D:\Docker_Kubernetes_The_Practical_Guide\multi-app\frontend\src:/app/src" --name goals-frontend --rm -p 3000:3000 -it goals-react
 ```
 
 eventually this works. if we want live update, we need to follow the article attached and use a linux based file system.
@@ -1015,8 +1015,12 @@ services:
 
 in the video there is an error, this requires our php dockerfile to get some more permissions (**might be a linux only issue**). we fix it by adding a `chwon` (change owner) command to `RUN` to give the default user permissions.
 
+
+**(we should also fix the image to use *php:8.1.0RC5-fpm-alpine3.14* instead, this solved the problem for other people in the comments).**
+
 ```dockerfile
-FROM php:7.4-fpm-alpine
+# FROM php:7.4-fpm-alpine
+FROM php:8.1.0RC5-fpm-alpine3.14
 
 WORKDIR /var/www/html
 
