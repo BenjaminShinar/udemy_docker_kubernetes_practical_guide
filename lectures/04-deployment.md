@@ -514,6 +514,4 @@ multistage build can also help us, especially with applications that have a buil
 
 tradeoff between Control vs Ease-Of-Use, security also matters here.
 
-#### Module Resources
-
 </details>

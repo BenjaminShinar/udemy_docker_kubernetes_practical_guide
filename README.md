@@ -1,6 +1,6 @@
 <!--
 ignore these words in spell check for this file
-// cSpell:ignore udemy hyperv
+// cSpell:ignore udemy hyperv kubeconfig
 -->
 
 # Docker & Kubernetes: The Practical Guide
@@ -160,8 +160,6 @@ commands
 kubectl commands
 </summary>
 
-</details>
-
 - *create \<resource> \<name>* 
   - *deployment*
     - *--image*
@@ -227,4 +225,107 @@ curl --location --request GET 'localhost/story'
 # curl alternative
 Invoke-RestMethod 'localhost/story' -Method 'GET' -Headers $headers | ConvertTo-Json 
 ```
+</details>
+
+## AWS EKS
+
+<details>
+<summary>
+Setting up aws eks cluster
+</summary>
+
+EKS - elastic kubernetes cluster
+
+### Create Cluster
+
+**steps:**
+
+#### Configure cluster
+create cluster, give it a *name*, kubernetes version.
+
+cluster service roles (IAM):
+
+configure eks roles:
+- <kbd>Create Role</kbd> -> <kbd>EKS</kbd> - > <kbd>EKS-Cluster</kbd> -> <kbd>Next: Permission</kbd>
+- give name such as '*eksClusterRole*', and <kbd>Create Role</kbd>
+
+back in the eks, use the newly created role.
+
+#### Specify networking
+
+we want it to also private and also accessible,
+
+search for *aws CloudFormation* service.\
+<kbd>Create Stack</kbd>, then use [this link](https://docs.aws.amazon.com/eks/latest/userguide/create-public-private-vpc.html#create-vpc) to grab the template for the **Amazon S3 URL**
+> "https://amazon-eks.s3.us-west-2.amazonaws.com/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml"
+
+click next and give the stack a name. create the stack.
+
+back in the eks cluster page, choose this stack as the VPC.
+
+for **Cluster endpoint access**, choose <kbd>Public and Private</kbd>.
+
+#### Configure Logging
+nothing here.
+#### review and create
+nothing here.
+
+
+now we need to wait for the cluster to be created, and then add nodes.
+
+to set kubectl to use this cluster (and not minikube), we need to change the *config* file at the *.kube* hidden folder.
+
+we want it to talk to the eks cluster, so we copy backup the file, and then we use the *aws-cli* tool to configure the cluster.
+
+click on <kbd>account</kbd>
+security credentials. <kbd>Create new access key</kbd>, download it. this file has *AWSAccessKeyId* and *AWSSecretKey* variables
+
+
+(couldn't find this!)
+
+and then run `aws configure` with those values. this will set the config folder.
+
+```sh
+#aws eks --region <region> update-kubeconfig --name <cluster name>
+aws eks --region us-east-2 update-kubeconfig --name FirstCluster
+```
+
+now if we inspect this file we would see some aws things
+
+### Add Nodes To Cluster
+
+now we want to add Nodes
+
+so we move to the <kbd>compute tab</kbd> and click <kbd>add node group</kbd>
+
+#### Configure Node Group
+
+assign name: *whatever*
+
+Node IAM role: open IAM:\
+<kbd>Create Role</kbd>, then select use case <kbd>EC2</kbd> and choose policies:
+- AmazonEKSWorkerNodePolicy
+- AmazonEKS_CNI_Policy
+- AmazonEC2ContainerRegistryReadOnly
+
+create this role and pick it for the node group.
+
+#### Set Compute and scaling configuration
+
+for instance type use *t3.small*.
+choose scaling policy, start with two nodes.
+
+#### Specify networking
+nothing here
+#### Review and Create
+nothing here
+
+now we should wait until the node group is created.
+
+we will use EC2 service later.
+
+[connect to amazon eks cluster](https://aws.amazon.com/premiumsupport/knowledge-center/eks-cluster-connection/)
+
+[creating IAM admin user and user group](https://docs.aws.amazon.com/IAM/latest/UserGuide/getting-started_create-admin-group.html)
+
 </details>
